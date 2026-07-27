@@ -1,0 +1,12 @@
+package com.example.notes.application.coolproject.exception;
+
+public enum ErrorCode {
+    EXPENSE_NOT_FOUND,
+    EXPENSE_ALREADY_DELETED,
+    INVALID_REQUEST_DATA,
+    INCONSISTENCY_REQUEST,
+    INTERNAL_SERVER_ERROR,
+    RESOURCE_ALREADY_EXISTS,
+    CATEGORY_NOT_FOUND,
+    USER_NOT_FOUND
+}
