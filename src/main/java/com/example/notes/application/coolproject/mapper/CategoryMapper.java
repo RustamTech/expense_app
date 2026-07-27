@@ -13,12 +13,12 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 @Mapper(componentModel = "spring")
 public interface CategoryMapper {
 
-    @Mapping(target = "defaultCategory", ignore = true)
-    CategoryEntity toEntity(CategoryCreateRequest request);
+  @Mapping(target = "defaultCategory", ignore = true)
+  CategoryEntity toEntity(CategoryCreateRequest request);
 
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "defaultCategory", ignore = true)
-    void updateCategory(CategoryUpdateRequest request, @MappingTarget CategoryEntity entity);
+  @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+  @Mapping(target = "defaultCategory", ignore = true)
+  void updateCategory(CategoryUpdateRequest request, @MappingTarget CategoryEntity entity);
 
-    CategoryResponse toResponse(CategoryEntity entity);
+  CategoryResponse toResponse(CategoryEntity entity);
 }

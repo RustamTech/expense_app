@@ -4,22 +4,21 @@ import com.example.notes.application.coolproject.dto.expenseDto.ExpenseCreateReq
 import com.example.notes.application.coolproject.dto.expenseDto.ExpenseResponse;
 import com.example.notes.application.coolproject.dto.expenseDto.ExpenseUpdateRequest;
 import com.example.notes.application.coolproject.enums.StatusType;
-
 import java.util.List;
 
 public interface ExpenseService {
 
-    ExpenseResponse findById(Long id);
+  ExpenseResponse findById(String email, Long id);
 
-    List<ExpenseResponse> findAll();
+  List<ExpenseResponse> findAll(String email);
 
-    List<ExpenseResponse> findAllByStatus(StatusType statusType);
+  List<ExpenseResponse> findAllByStatus(String email, StatusType statusType);
 
-    List<ExpenseResponse> findAllByCategory(Long categoryId);
+  List<ExpenseResponse> findAllByCategory(String email, Long categoryId);
 
-    void delete(Long id);
+  void delete(String email, Long id);
 
-    ExpenseResponse update(Long id, ExpenseUpdateRequest request);
+  ExpenseResponse update(String email, Long id, ExpenseUpdateRequest request);
 
-    ExpenseResponse create(ExpenseCreateRequest request);
+  ExpenseResponse create(String email, ExpenseCreateRequest request);
 }

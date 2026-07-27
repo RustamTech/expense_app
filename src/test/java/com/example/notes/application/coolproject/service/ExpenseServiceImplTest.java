@@ -1,31 +1,5 @@
 package com.example.notes.application.coolproject.service;
 
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseCreateRequest;
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseResponse;
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseUpdateRequest;
-import com.example.notes.application.coolproject.entity.CategoryEntity;
-import com.example.notes.application.coolproject.entity.ExpenseEntity;
-import com.example.notes.application.coolproject.enums.CategoryType;
-import com.example.notes.application.coolproject.enums.CurrencyType;
-import com.example.notes.application.coolproject.enums.StatusType;
-import com.example.notes.application.coolproject.exception.custom.CategoryNotFoundException;
-import com.example.notes.application.coolproject.exception.custom.ExpenseNotFoundException;
-import com.example.notes.application.coolproject.mapper.ExpenseMapper;
-import com.example.notes.application.coolproject.repository.CategoryRepository;
-import com.example.notes.application.coolproject.repository.ExpenseRepository;
-import com.example.notes.application.coolproject.service.expense.ExpenseServiceImpl;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,224 +7,317 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.notes.application.coolproject.dto.expenseDto.ExpenseCreateRequest;
+import com.example.notes.application.coolproject.dto.expenseDto.ExpenseResponse;
+import com.example.notes.application.coolproject.dto.expenseDto.ExpenseUpdateRequest;
+import com.example.notes.application.coolproject.entity.CategoryEntity;
+import com.example.notes.application.coolproject.entity.ExpenseEntity;
+import com.example.notes.application.coolproject.entity.UserEntity;
+import com.example.notes.application.coolproject.enums.CategoryType;
+import com.example.notes.application.coolproject.enums.CurrencyType;
+import com.example.notes.application.coolproject.enums.StatusType;
+import com.example.notes.application.coolproject.exception.custom.CategoryNotFoundException;
+import com.example.notes.application.coolproject.exception.custom.ExpenseNotFoundException;
+import com.example.notes.application.coolproject.exception.custom.UserNotFoundException;
+import com.example.notes.application.coolproject.mapper.ExpenseMapper;
+import com.example.notes.application.coolproject.repository.CategoryRepository;
+import com.example.notes.application.coolproject.repository.ExpenseRepository;
+import com.example.notes.application.coolproject.repository.UserRepository;
+import com.example.notes.application.coolproject.service.expense.ExpenseServiceImpl;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
 @ExtendWith(MockitoExtension.class)
 class ExpenseServiceImplTest {
 
-    @Mock
-    private ExpenseMapper expenseMapper;
+  private static final String EMAIL = "user@example.com";
+  private static final Long USER_ID = 1L;
 
-    @Mock
-    private ExpenseRepository expenseRepository;
+  @Mock private ExpenseMapper expenseMapper;
 
-    @Mock
-    private CategoryRepository categoryRepository;
+  @Mock private ExpenseRepository expenseRepository;
 
-    @InjectMocks
-    private ExpenseServiceImpl expenseService;
+  @Mock private CategoryRepository categoryRepository;
 
-    @Test
-    void findById_exists_returnsResponse() {
-        ExpenseEntity entity = buildExpenseEntity();
-        ExpenseResponse response = buildExpenseResponse(1L);
+  @Mock private UserRepository userRepository;
 
-        when(expenseRepository.findById(1L)).thenReturn(Optional.of(entity));
-        when(expenseMapper.toResponse(entity)).thenReturn(response);
+  @InjectMocks private ExpenseServiceImpl expenseService;
 
-        ExpenseResponse result = expenseService.findById(1L);
+  private void mockUser() {
+    when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(buildUserEntity()));
+  }
 
-        assertThat(result).isEqualTo(response);
-    }
+  @Test
+  void findById_exists_returnsResponse() {
+    mockUser();
+    ExpenseEntity entity = buildExpenseEntity();
+    ExpenseResponse response = buildExpenseResponse(1L);
 
-    @Test
-    void findById_notFound_throwsExpenseNotFoundException() {
-        when(expenseRepository.findById(99L)).thenReturn(Optional.empty());
+    when(expenseRepository.findByIdAndUser_Id(1L, USER_ID)).thenReturn(Optional.of(entity));
+    when(expenseMapper.toResponse(entity)).thenReturn(response);
 
-        assertThatThrownBy(() -> expenseService.findById(99L))
-                .isInstanceOf(ExpenseNotFoundException.class);
-    }
+    ExpenseResponse result = expenseService.findById(EMAIL, 1L);
 
-    @Test
-    void create_validRequest_returnsSavedResponse() {
-        ExpenseCreateRequest request = new ExpenseCreateRequest(
-                BigDecimal.TEN, "Lunch", null, CurrencyType.USD, LocalDate.now(), 1L, StatusType.PAID);
-        CategoryEntity category = buildCategoryEntity(1L);
-        ExpenseEntity entity = buildExpenseEntity();
-        ExpenseResponse response = buildExpenseResponse(1L);
+    assertThat(result).isEqualTo(response);
+  }
 
-        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
-        when(expenseMapper.toEntity(request)).thenReturn(entity);
-        when(expenseRepository.save(entity)).thenReturn(entity);
-        when(expenseMapper.toResponse(entity)).thenReturn(response);
+  @Test
+  void findById_notFound_throwsExpenseNotFoundException() {
+    mockUser();
+    when(expenseRepository.findByIdAndUser_Id(99L, USER_ID)).thenReturn(Optional.empty());
 
-        ExpenseResponse result = expenseService.create(request);
+    assertThatThrownBy(() -> expenseService.findById(EMAIL, 99L))
+        .isInstanceOf(ExpenseNotFoundException.class);
+  }
 
-        assertThat(result).isEqualTo(response);
-        verify(expenseRepository).save(entity);
-    }
+  @Test
+  void findById_userNotFound_throwsUserNotFoundException() {
+    when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
-    @Test
-    void create_categoryNotFound_throwsCategoryNotFoundException() {
-        ExpenseCreateRequest request = new ExpenseCreateRequest(
-                BigDecimal.TEN, "Lunch", null, CurrencyType.USD, LocalDate.now(), 99L, StatusType.PAID);
+    assertThatThrownBy(() -> expenseService.findById(EMAIL, 1L))
+        .isInstanceOf(UserNotFoundException.class);
+  }
 
-        when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
+  @Test
+  void create_validRequest_returnsSavedResponse() {
+    mockUser();
+    ExpenseCreateRequest request =
+        new ExpenseCreateRequest(
+            BigDecimal.TEN, "Lunch", null, CurrencyType.USD, LocalDate.now(), 1L, StatusType.PAID);
+    CategoryEntity category = buildCategoryEntity(1L);
+    ExpenseEntity entity = buildExpenseEntity();
+    ExpenseResponse response = buildExpenseResponse(1L);
 
-        assertThatThrownBy(() -> expenseService.create(request))
-                .isInstanceOf(CategoryNotFoundException.class);
+    when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
+    when(expenseMapper.toEntity(request)).thenReturn(entity);
+    when(expenseRepository.save(entity)).thenReturn(entity);
+    when(expenseMapper.toResponse(entity)).thenReturn(response);
 
-        verify(expenseRepository, never()).save(any());
-    }
+    ExpenseResponse result = expenseService.create(EMAIL, request);
 
-    @Test
-    void update_existingExpense_returnsUpdatedResponse() {
-        ExpenseUpdateRequest request = new ExpenseUpdateRequest(
-                BigDecimal.valueOf(20), "Dinner", null, CurrencyType.EUR, LocalDate.now(), null, StatusType.PLANNED);
-        ExpenseEntity entity = buildExpenseEntity();
-        ExpenseResponse response = buildExpenseResponse(1L);
+    assertThat(result).isEqualTo(response);
+    assertThat(entity.getUser()).isEqualTo(buildUserEntity());
+    verify(expenseRepository).save(entity);
+  }
 
-        when(expenseRepository.findById(1L)).thenReturn(Optional.of(entity));
-        when(expenseRepository.save(entity)).thenReturn(entity);
-        when(expenseMapper.toResponse(entity)).thenReturn(response);
+  @Test
+  void create_categoryNotFound_throwsCategoryNotFoundException() {
+    mockUser();
+    ExpenseCreateRequest request =
+        new ExpenseCreateRequest(
+            BigDecimal.TEN, "Lunch", null, CurrencyType.USD, LocalDate.now(), 99L, StatusType.PAID);
 
-        ExpenseResponse result = expenseService.update(1L, request);
+    when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThat(result).isEqualTo(response);
-        verify(expenseMapper).updateEntity(request, entity);
-    }
+    assertThatThrownBy(() -> expenseService.create(EMAIL, request))
+        .isInstanceOf(CategoryNotFoundException.class);
 
-    @Test
-    void update_notFound_throwsExpenseNotFoundException() {
-        ExpenseUpdateRequest request = new ExpenseUpdateRequest(
-                BigDecimal.TEN, "Lunch", null, CurrencyType.USD, LocalDate.now(), null, StatusType.PAID);
+    verify(expenseRepository, never()).save(any());
+  }
 
-        when(expenseRepository.findById(99L)).thenReturn(Optional.empty());
+  @Test
+  void update_existingExpense_returnsUpdatedResponse() {
+    mockUser();
+    ExpenseUpdateRequest request =
+        new ExpenseUpdateRequest(
+            BigDecimal.valueOf(20),
+            "Dinner",
+            null,
+            CurrencyType.EUR,
+            LocalDate.now(),
+            null,
+            StatusType.PLANNED);
+    ExpenseEntity entity = buildExpenseEntity();
+    ExpenseResponse response = buildExpenseResponse(1L);
 
-        assertThatThrownBy(() -> expenseService.update(99L, request))
-                .isInstanceOf(ExpenseNotFoundException.class);
-    }
+    when(expenseRepository.findByIdAndUser_Id(1L, USER_ID)).thenReturn(Optional.of(entity));
+    when(expenseRepository.save(entity)).thenReturn(entity);
+    when(expenseMapper.toResponse(entity)).thenReturn(response);
 
-    @Test
-    void update_withNewCategory_loadsAndAssignsCategory() {
-        ExpenseUpdateRequest request = new ExpenseUpdateRequest(
-                BigDecimal.TEN, "Lunch", null, CurrencyType.USD, LocalDate.now(), 2L, StatusType.PAID);
-        ExpenseEntity entity = buildExpenseEntity();
-        CategoryEntity newCategory = buildCategoryEntity(2L);
-        ExpenseResponse response = buildExpenseResponse(1L);
+    ExpenseResponse result = expenseService.update(EMAIL, 1L, request);
 
-        when(expenseRepository.findById(1L)).thenReturn(Optional.of(entity));
-        when(categoryRepository.findById(2L)).thenReturn(Optional.of(newCategory));
-        when(expenseRepository.save(entity)).thenReturn(entity);
-        when(expenseMapper.toResponse(entity)).thenReturn(response);
+    assertThat(result).isEqualTo(response);
+    verify(expenseMapper).updateEntity(request, entity);
+  }
 
-        expenseService.update(1L, request);
+  @Test
+  void update_notFound_throwsExpenseNotFoundException() {
+    mockUser();
+    ExpenseUpdateRequest request =
+        new ExpenseUpdateRequest(
+            BigDecimal.TEN,
+            "Lunch",
+            null,
+            CurrencyType.USD,
+            LocalDate.now(),
+            null,
+            StatusType.PAID);
 
-        assertThat(entity.getCategory()).isEqualTo(newCategory);
-    }
+    when(expenseRepository.findByIdAndUser_Id(99L, USER_ID)).thenReturn(Optional.empty());
 
-    @Test
-    void update_newCategoryNotFound_throwsCategoryNotFoundException() {
-        ExpenseUpdateRequest request = new ExpenseUpdateRequest(
-                BigDecimal.TEN, "Lunch", null, CurrencyType.USD, LocalDate.now(), 99L, StatusType.PAID);
-        ExpenseEntity entity = buildExpenseEntity();
+    assertThatThrownBy(() -> expenseService.update(EMAIL, 99L, request))
+        .isInstanceOf(ExpenseNotFoundException.class);
+  }
 
-        when(expenseRepository.findById(1L)).thenReturn(Optional.of(entity));
-        when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
+  @Test
+  void update_withNewCategory_loadsAndAssignsCategory() {
+    mockUser();
+    ExpenseUpdateRequest request =
+        new ExpenseUpdateRequest(
+            BigDecimal.TEN, "Lunch", null, CurrencyType.USD, LocalDate.now(), 2L, StatusType.PAID);
+    ExpenseEntity entity = buildExpenseEntity();
+    CategoryEntity newCategory = buildCategoryEntity(2L);
+    ExpenseResponse response = buildExpenseResponse(1L);
 
-        assertThatThrownBy(() -> expenseService.update(1L, request))
-                .isInstanceOf(CategoryNotFoundException.class);
-    }
+    when(expenseRepository.findByIdAndUser_Id(1L, USER_ID)).thenReturn(Optional.of(entity));
+    when(categoryRepository.findById(2L)).thenReturn(Optional.of(newCategory));
+    when(expenseRepository.save(entity)).thenReturn(entity);
+    when(expenseMapper.toResponse(entity)).thenReturn(response);
 
-    @Test
-    void delete_existingExpense_deletesSuccessfully() {
-        ExpenseEntity entity = buildExpenseEntity();
-        when(expenseRepository.findById(1L)).thenReturn(Optional.of(entity));
+    expenseService.update(EMAIL, 1L, request);
 
-        expenseService.delete(1L);
+    assertThat(entity.getCategory()).isEqualTo(newCategory);
+  }
 
-        verify(expenseRepository).delete(entity);
-    }
+  @Test
+  void update_newCategoryNotFound_throwsCategoryNotFoundException() {
+    mockUser();
+    ExpenseUpdateRequest request =
+        new ExpenseUpdateRequest(
+            BigDecimal.TEN, "Lunch", null, CurrencyType.USD, LocalDate.now(), 99L, StatusType.PAID);
+    ExpenseEntity entity = buildExpenseEntity();
 
-    @Test
-    void delete_notFound_throwsExpenseNotFoundException() {
-        when(expenseRepository.findById(99L)).thenReturn(Optional.empty());
+    when(expenseRepository.findByIdAndUser_Id(1L, USER_ID)).thenReturn(Optional.of(entity));
+    when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> expenseService.delete(99L))
-                .isInstanceOf(ExpenseNotFoundException.class);
+    assertThatThrownBy(() -> expenseService.update(EMAIL, 1L, request))
+        .isInstanceOf(CategoryNotFoundException.class);
+  }
 
-        verify(expenseRepository, never()).delete(any());
-    }
+  @Test
+  void delete_existingExpense_deletesSuccessfully() {
+    mockUser();
+    ExpenseEntity entity = buildExpenseEntity();
+    when(expenseRepository.findByIdAndUser_Id(1L, USER_ID)).thenReturn(Optional.of(entity));
 
-    @Test
-    void findAll_returnsMappedList() {
-        ExpenseEntity entity = buildExpenseEntity();
-        ExpenseResponse response = buildExpenseResponse(1L);
+    expenseService.delete(EMAIL, 1L);
 
-        when(expenseRepository.findAll()).thenReturn(List.of(entity));
-        when(expenseMapper.toResponse(entity)).thenReturn(response);
+    verify(expenseRepository).delete(entity);
+  }
 
-        List<ExpenseResponse> result = expenseService.findAll();
+  @Test
+  void delete_notFound_throwsExpenseNotFoundException() {
+    mockUser();
+    when(expenseRepository.findByIdAndUser_Id(99L, USER_ID)).thenReturn(Optional.empty());
 
-        assertThat(result).hasSize(1).containsExactly(response);
-    }
+    assertThatThrownBy(() -> expenseService.delete(EMAIL, 99L))
+        .isInstanceOf(ExpenseNotFoundException.class);
 
-    @Test
-    void findAllByStatus_returnsFilteredList() {
-        ExpenseEntity entity = buildExpenseEntity();
-        ExpenseResponse response = buildExpenseResponse(1L);
+    verify(expenseRepository, never()).delete(any());
+  }
 
-        when(expenseRepository.findAllByStatusType(StatusType.PAID)).thenReturn(List.of(entity));
-        when(expenseMapper.toResponse(entity)).thenReturn(response);
+  @Test
+  void findAll_returnsMappedList() {
+    mockUser();
+    ExpenseEntity entity = buildExpenseEntity();
+    ExpenseResponse response = buildExpenseResponse(1L);
 
-        List<ExpenseResponse> result = expenseService.findAllByStatus(StatusType.PAID);
+    when(expenseRepository.findAllByUser_Id(USER_ID)).thenReturn(List.of(entity));
+    when(expenseMapper.toResponse(entity)).thenReturn(response);
 
-        assertThat(result).hasSize(1);
-    }
+    List<ExpenseResponse> result = expenseService.findAll(EMAIL);
 
-    @Test
-    void findAllByCategory_validCategory_returnsFilteredList() {
-        CategoryEntity category = buildCategoryEntity(1L);
-        ExpenseEntity entity = buildExpenseEntity();
-        ExpenseResponse response = buildExpenseResponse(1L);
+    assertThat(result).hasSize(1).containsExactly(response);
+  }
 
-        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
-        when(expenseRepository.findAllByCategory_Id(1L)).thenReturn(List.of(entity));
-        when(expenseMapper.toResponse(entity)).thenReturn(response);
+  @Test
+  void findAllByStatus_returnsFilteredList() {
+    mockUser();
+    ExpenseEntity entity = buildExpenseEntity();
+    ExpenseResponse response = buildExpenseResponse(1L);
 
-        List<ExpenseResponse> result = expenseService.findAllByCategory(1L);
+    when(expenseRepository.findAllByUser_IdAndStatusType(USER_ID, StatusType.PAID))
+        .thenReturn(List.of(entity));
+    when(expenseMapper.toResponse(entity)).thenReturn(response);
 
-        assertThat(result).hasSize(1);
-    }
+    List<ExpenseResponse> result = expenseService.findAllByStatus(EMAIL, StatusType.PAID);
 
-    @Test
-    void findAllByCategory_categoryNotFound_throwsCategoryNotFoundException() {
-        when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
+    assertThat(result).hasSize(1);
+  }
 
-        assertThatThrownBy(() -> expenseService.findAllByCategory(99L))
-                .isInstanceOf(CategoryNotFoundException.class);
-    }
+  @Test
+  void findAllByCategory_validCategory_returnsFilteredList() {
+    mockUser();
+    CategoryEntity category = buildCategoryEntity(1L);
+    ExpenseEntity entity = buildExpenseEntity();
+    ExpenseResponse response = buildExpenseResponse(1L);
 
-    private ExpenseEntity buildExpenseEntity() {
-        ExpenseEntity e = new ExpenseEntity();
-        e.setAmount(BigDecimal.TEN);
-        e.setDescription("Lunch");
-        e.setDate(LocalDate.now());
-        e.setStatusType(StatusType.PAID);
-        e.setCurrencyType(CurrencyType.USD);
-        e.setCategory(buildCategoryEntity(1L));
-        return e;
-    }
+    when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
+    when(expenseRepository.findAllByUser_IdAndCategory_Id(USER_ID, 1L))
+        .thenReturn(List.of(entity));
+    when(expenseMapper.toResponse(entity)).thenReturn(response);
 
-    private CategoryEntity buildCategoryEntity(Long id) {
-        CategoryEntity c = new CategoryEntity();
-        c.setName("Food");
-        c.setIcon("🍔");
-        c.setColor("red");
-        c.setCategoryType(CategoryType.EXPENSE);
-        return c;
-    }
+    List<ExpenseResponse> result = expenseService.findAllByCategory(EMAIL, 1L);
 
-    private ExpenseResponse buildExpenseResponse(Long id) {
-        return new ExpenseResponse(id, BigDecimal.TEN, "Lunch", null, LocalDate.now(),
-                null, StatusType.PAID, CurrencyType.USD, LocalDateTime.now(), LocalDateTime.now());
-    }
+    assertThat(result).hasSize(1);
+  }
+
+  @Test
+  void findAllByCategory_categoryNotFound_throwsCategoryNotFoundException() {
+    mockUser();
+    when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> expenseService.findAllByCategory(EMAIL, 99L))
+        .isInstanceOf(CategoryNotFoundException.class);
+  }
+
+  private UserEntity buildUserEntity() {
+    UserEntity user = new UserEntity();
+    ReflectionTestUtils.setField(user, "id", USER_ID);
+    user.setEmail(EMAIL);
+    return user;
+  }
+
+  private ExpenseEntity buildExpenseEntity() {
+    ExpenseEntity e = new ExpenseEntity();
+    e.setAmount(BigDecimal.TEN);
+    e.setDescription("Lunch");
+    e.setDate(LocalDate.now());
+    e.setStatusType(StatusType.PAID);
+    e.setCurrencyType(CurrencyType.USD);
+    e.setCategory(buildCategoryEntity(1L));
+    return e;
+  }
+
+  private CategoryEntity buildCategoryEntity(Long id) {
+    CategoryEntity c = new CategoryEntity();
+    c.setName("Food");
+    c.setIcon("🍔");
+    c.setColor("red");
+    c.setCategoryType(CategoryType.EXPENSE);
+    return c;
+  }
+
+  private ExpenseResponse buildExpenseResponse(Long id) {
+    return new ExpenseResponse(
+        id,
+        BigDecimal.TEN,
+        "Lunch",
+        null,
+        LocalDate.now(),
+        null,
+        StatusType.PAID,
+        CurrencyType.USD,
+        LocalDateTime.now(),
+        LocalDateTime.now());
+  }
 }

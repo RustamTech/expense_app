@@ -6,21 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public record CategoryCreateRequest(
-
-        @Schema(description = "Expense amount", example = "15")
-        @NotBlank
-        String icon,
-
-        @Schema(description = "Color of icon", example = "Green")
-        @NotBlank
-        String color,
-
-        @Schema(description = "Name of expense", example = "MC")
-        @NotBlank
-        String name,
-
-        @Schema(description = "Name of category's type", example = "Drinks")
-        @NotNull
-        CategoryType categoryType
-) {
-}
+    @Schema(description = "Expense amount", example = "15") @NotBlank String icon,
+    @Schema(description = "Color of icon", example = "Green") @NotBlank String color,
+    @Schema(description = "Name of expense", example = "MC") @NotBlank String name,
+    @Schema(description = "Name of category's type", example = "Drinks") @NotNull CategoryType categoryType) {}

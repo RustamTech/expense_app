@@ -22,19 +22,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserService userService;
+  private final UserService userService;
 
-    @Operation(summary = "Get current user profile")
-    @GetMapping(Endpoints.USER_ME)
-    public ResponseEntity<UserResponse> getMe(Authentication authentication) {
-        return ResponseEntity.ok(userService.getCurrentUser(authentication.getName()));
-    }
+  @Operation(summary = "Get current user profile")
+  @GetMapping(Endpoints.USER_ME)
+  public ResponseEntity<UserResponse> getMe(Authentication authentication) {
+    return ResponseEntity.ok(userService.getCurrentUser(authentication.getName()));
+  }
 
-    @Operation(summary = "Update current user profile")
-    @PutMapping(Endpoints.USER_ME)
-    public ResponseEntity<UserResponse> updateMe(
-            Authentication authentication,
-            @Valid @RequestBody UserUpdateRequest request) {
-        return ResponseEntity.ok(userService.updateCurrentUser(authentication.getName(), request));
-    }
+  @Operation(summary = "Update current user profile")
+  @PutMapping(Endpoints.USER_ME)
+  public ResponseEntity<UserResponse> updateMe(
+      Authentication authentication, @Valid @RequestBody UserUpdateRequest request) {
+    return ResponseEntity.ok(userService.updateCurrentUser(authentication.getName(), request));
+  }
 }

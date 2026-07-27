@@ -3,18 +3,16 @@ package com.example.notes.application.coolproject.service.category;
 import com.example.notes.application.coolproject.dto.categoryDto.CategoryCreateRequest;
 import com.example.notes.application.coolproject.dto.categoryDto.CategoryResponse;
 import com.example.notes.application.coolproject.dto.categoryDto.CategoryUpdateRequest;
-import com.example.notes.application.coolproject.entity.CategoryEntity;
-
 import java.util.List;
 
 public interface CategoryService {
-    CategoryResponse findById(Long id);
+  CategoryResponse findById(Long id);
 
-    List<CategoryResponse> findAll();
+  List<CategoryResponse> findAll();
 
-    CategoryResponse create(CategoryCreateRequest request);
+  CategoryResponse create(CategoryCreateRequest request);
 
-    CategoryResponse update(Long id, CategoryUpdateRequest request);
+  CategoryResponse update(Long id, CategoryUpdateRequest request);
 
-    void delete(Long id);
+  void delete(Long id);
 }

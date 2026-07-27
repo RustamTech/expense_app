@@ -6,11 +6,8 @@ import org.springframework.http.HttpStatus;
 
 public class ExpenseNotFoundException extends BaseException {
 
-    public ExpenseNotFoundException(Long id){
-        super(
-                ErrorCode.EXPENSE_NOT_FOUND,
-                HttpStatus.NOT_FOUND,
-                "Expense with id " + id + " not found"
-        );
-    }
+  public ExpenseNotFoundException(Long id) {
+    super(
+        ErrorCode.EXPENSE_NOT_FOUND, HttpStatus.NOT_FOUND, "Expense with id " + id + " not found");
+  }
 }

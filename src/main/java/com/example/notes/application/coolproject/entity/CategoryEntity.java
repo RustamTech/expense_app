@@ -15,20 +15,19 @@ import lombok.Setter;
 @Setter
 public class CategoryEntity extends BaseEntity {
 
-    @Column(nullable = false)
-    private String name;
+  @Column(nullable = false)
+  private String name;
 
-    @Column(nullable = false)
-    private String icon;
+  @Column(nullable = false)
+  private String icon;
 
-    @Column(nullable = false)
-    private String color;
+  @Column(nullable = false)
+  private String color;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CategoryType categoryType;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private CategoryType categoryType;
 
-    @Column(nullable = false)
-    private boolean defaultCategory;
+  @Column(nullable = false)
+  private boolean defaultCategory;
 }
-

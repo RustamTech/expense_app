@@ -5,6 +5,7 @@ import com.example.notes.application.coolproject.dto.auth.LoginRequest;
 import com.example.notes.application.coolproject.dto.auth.RegisterRequest;
 
 public interface AuthService {
-    AuthResponse register(RegisterRequest request);
-    AuthResponse login(LoginRequest request);
+  AuthResponse register(RegisterRequest request);
+
+  AuthResponse login(LoginRequest request);
 }

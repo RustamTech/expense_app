@@ -6,11 +6,7 @@ import org.springframework.http.HttpStatus;
 
 public class InconsistencyRequestException extends BaseException {
 
-    public InconsistencyRequestException(String message){
-        super(
-                ErrorCode.INCONSISTENCY_REQUEST,
-                HttpStatus.BAD_REQUEST,
-                message
-        );
-    }
+  public InconsistencyRequestException(String message) {
+    super(ErrorCode.INCONSISTENCY_REQUEST, HttpStatus.BAD_REQUEST, message);
+  }
 }

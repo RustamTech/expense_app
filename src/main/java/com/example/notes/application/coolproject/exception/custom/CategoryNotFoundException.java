@@ -6,11 +6,10 @@ import org.springframework.http.HttpStatus;
 
 public class CategoryNotFoundException extends BaseException {
 
-    public CategoryNotFoundException(Long id){
-        super(
-                ErrorCode.CATEGORY_NOT_FOUND,
-                HttpStatus.NOT_FOUND,
-                "Category with this id " + id + " not found"
-        );
-    }
+  public CategoryNotFoundException(Long id) {
+    super(
+        ErrorCode.CATEGORY_NOT_FOUND,
+        HttpStatus.NOT_FOUND,
+        "Category with this id " + id + " not found");
+  }
 }

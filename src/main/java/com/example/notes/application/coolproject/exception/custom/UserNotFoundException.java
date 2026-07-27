@@ -6,7 +6,7 @@ import org.springframework.http.HttpStatus;
 
 public class UserNotFoundException extends BaseException {
 
-    public UserNotFoundException(String email) {
-        super(ErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND, "User not found with email: " + email);
-    }
+  public UserNotFoundException(String email) {
+    super(ErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND, "User not found with email: " + email);
+  }
 }

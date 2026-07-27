@@ -13,12 +13,13 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 @Mapper(componentModel = "spring")
 public interface ExpenseMapper {
 
-    @Mapping(target = "category", ignore = true)
-    ExpenseEntity toEntity(ExpenseCreateRequest request);
+  @Mapping(target = "category", ignore = true)
+  @Mapping(target = "user", ignore = true)
+  ExpenseEntity toEntity(ExpenseCreateRequest request);
 
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "category", ignore = true)
-    void updateEntity(ExpenseUpdateRequest request, @MappingTarget ExpenseEntity entity);
+  @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+  @Mapping(target = "category", ignore = true)
+  void updateEntity(ExpenseUpdateRequest request, @MappingTarget ExpenseEntity entity);
 
-    ExpenseResponse toResponse(ExpenseEntity entity);
+  ExpenseResponse toResponse(ExpenseEntity entity);
 }
