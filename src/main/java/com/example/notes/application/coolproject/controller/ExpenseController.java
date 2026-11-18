@@ -79,6 +79,7 @@ public class ExpenseController {
   @GetMapping(Endpoints.EXPENSES_BY_CATEGORY)
   public ResponseEntity<List<ExpenseResponse>> findAllByCategory(
       Authentication authentication, @PathVariable Long categoryId) {
-    return ResponseEntity.ok(expenseService.findAllByCategory(authentication.getName(), categoryId));
+    return ResponseEntity.ok(
+        expenseService.findAllByCategory(authentication.getName(), categoryId));
   }
 }

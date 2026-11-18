@@ -1,0 +1,11 @@
+# Test profile: local Postgres (docker compose / CI service), schema recreated per run.
+spring:
+  datasource:
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+jwt:
+  secret: dGVzdC1vbmx5LXNlY3JldC1rZXktZm9yLWV4cGVuc2UtYXBpLWludGVncmF0aW9uLXRlc3Rz
+  expiration: 3600000

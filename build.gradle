@@ -3,6 +3,7 @@ plugins {
 	id 'org.springframework.boot' version '3.4.5'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'com.diffplug.spotless' version '7.0.4'
+	id 'jacoco'
 }
 
 group = 'com.example.notes.application'
@@ -65,6 +66,71 @@ spotless {
 	}
 }
 
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+	// -parameters: Spring resolves @PathVariable/@RequestParam names without explicit values
+	options.compilerArgs += ['-parameters', '-Xlint:unchecked', '-Xlint:deprecation']
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
+	finalizedBy tasks.named('jacocoTestReport')
+	// `-PunitOnly` skips tests that need the local Postgres (docker compose up -d postgres).
+	// Used by the Claude Code Stop hook for a fast feedback loop.
+	if (project.hasProperty('unitOnly')) {
+		filter { excludeTestsMatching '*ApplicationTests' }
+	}
+}
+
+// Local runs use the `dev` profile (docker-compose credentials, dev JWT secret, bootstrap admin)
+// unless SPRING_PROFILES_ACTIVE says otherwise.
+tasks.named('bootRun') {
+	systemProperty 'spring.profiles.active', System.getenv('SPRING_PROFILES_ACTIVE') ?: 'dev'
+}
+
+// ---- Coverage (JaCoCo) ----
+// Only business logic is measured: boilerplate (DTOs, entities, enums, config,
+// generated MapStruct mappers, the bootstrap class) is excluded.
+def coverageExcludes = [
+	'**/CoolprojectApplication*',
+	'**/config/**',
+	'**/dto/**',
+	'**/entity/**',
+	'**/enums/**',
+	'**/mapper/**',
+]
+
+jacoco {
+	toolVersion = '0.8.13'
+}
+
+tasks.named('jacocoTestReport') {
+	dependsOn tasks.named('test')
+	reports {
+		xml.required = true
+		html.required = true
+	}
+	classDirectories.setFrom(files(classDirectories.files.collect {
+		fileTree(dir: it, exclude: coverageExcludes)
+	}))
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+	dependsOn tasks.named('test')
+	classDirectories.setFrom(files(classDirectories.files.collect {
+		fileTree(dir: it, exclude: coverageExcludes)
+	}))
+	violationRules {
+		rule {
+			limit {
+				counter = 'LINE'
+				minimum = 0.80
+			}
+		}
+	}
+}
+
+// `./gradlew check` = spotlessCheck + tests + coverage gate (80% lines)
+tasks.named('check') {
+	dependsOn tasks.named('jacocoTestCoverageVerification')
 }

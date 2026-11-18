@@ -5,17 +5,26 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/expensedb}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:update}
+    # Entities never leave the service layer, so no lazy loading is needed in the web layer.
+    open-in-view: false
     show-sql: false
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:
       hibernate:
         format_sql: true
+
+server:
+  error:
+    # Errors are rendered by GlobalExceptionHandler; never leak internals from the fallback page.
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
 
 springdoc:
   api-docs:
@@ -23,9 +32,15 @@ springdoc:
   swagger-ui:
     path: /swagger-ui
 
+# Required: no default secret, the application fails to start without JWT_SECRET.
 jwt:
-  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
+
+app:
+  admin:
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
 
 logging:
   level:

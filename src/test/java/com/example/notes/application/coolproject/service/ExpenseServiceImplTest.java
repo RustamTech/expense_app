@@ -262,8 +262,7 @@ class ExpenseServiceImplTest {
     ExpenseResponse response = buildExpenseResponse(1L);
 
     when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
-    when(expenseRepository.findAllByUser_IdAndCategory_Id(USER_ID, 1L))
-        .thenReturn(List.of(entity));
+    when(expenseRepository.findAllByUser_IdAndCategory_Id(USER_ID, 1L)).thenReturn(List.of(entity));
     when(expenseMapper.toResponse(entity)).thenReturn(response);
 
     List<ExpenseResponse> result = expenseService.findAllByCategory(EMAIL, 1L);

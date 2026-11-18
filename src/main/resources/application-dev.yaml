@@ -1,0 +1,13 @@
+# Local development only (./gradlew bootRun activates this profile by default).
+# These values match docker-compose.yaml and must never be used outside a developer machine.
+spring:
+  datasource:
+    password: ${DB_PASSWORD:postgres}
+
+jwt:
+  secret: ${JWT_SECRET:ZGV2LW9ubHktc2VjcmV0LWtleS1mb3ItbG9jYWwtZXhwZW5zZS1hcGktMjU2Yml0cw==}
+
+app:
+  admin:
+    email: ${ADMIN_EMAIL:admin@local.dev}
+    password: ${ADMIN_PASSWORD:admin12345}
