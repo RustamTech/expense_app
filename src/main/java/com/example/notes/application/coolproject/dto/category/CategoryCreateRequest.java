@@ -1,4 +1,4 @@
-package com.example.notes.application.coolproject.dto.categoryDto;
+package com.example.notes.application.coolproject.dto.category;
 
 import com.example.notes.application.coolproject.enums.CategoryType;
 import io.swagger.v3.oas.annotations.media.Schema;

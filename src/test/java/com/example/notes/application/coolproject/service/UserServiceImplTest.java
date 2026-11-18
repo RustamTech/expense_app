@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.notes.application.coolproject.dto.userDto.UserResponse;
-import com.example.notes.application.coolproject.dto.userDto.UserUpdateRequest;
+import com.example.notes.application.coolproject.dto.user.UserResponse;
+import com.example.notes.application.coolproject.dto.user.UserUpdateRequest;
 import com.example.notes.application.coolproject.entity.UserEntity;
 import com.example.notes.application.coolproject.enums.UserRole;
 import com.example.notes.application.coolproject.exception.custom.UserNotFoundException;

@@ -7,9 +7,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.notes.application.coolproject.dto.categoryDto.CategoryCreateRequest;
-import com.example.notes.application.coolproject.dto.categoryDto.CategoryResponse;
-import com.example.notes.application.coolproject.dto.categoryDto.CategoryUpdateRequest;
+import com.example.notes.application.coolproject.dto.category.CategoryCreateRequest;
+import com.example.notes.application.coolproject.dto.category.CategoryResponse;
+import com.example.notes.application.coolproject.dto.category.CategoryUpdateRequest;
 import com.example.notes.application.coolproject.entity.CategoryEntity;
 import com.example.notes.application.coolproject.enums.CategoryType;
 import com.example.notes.application.coolproject.exception.custom.CategoryNotFoundException;

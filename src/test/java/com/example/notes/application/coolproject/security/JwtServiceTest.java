@@ -1,9 +1,8 @@
-package com.example.notes.application.coolproject.service;
+package com.example.notes.application.coolproject.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.example.notes.application.coolproject.service.security.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.security.SignatureException;

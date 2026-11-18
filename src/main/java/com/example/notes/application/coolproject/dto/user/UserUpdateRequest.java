@@ -1,4 +1,4 @@
-package com.example.notes.application.coolproject.dto.userDto;
+package com.example.notes.application.coolproject.dto.user;
 
 import jakarta.validation.constraints.NotBlank;
 

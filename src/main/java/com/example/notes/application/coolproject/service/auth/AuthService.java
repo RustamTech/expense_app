@@ -1,4 +1,4 @@
-package com.example.notes.application.coolproject.service.security;
+package com.example.notes.application.coolproject.service.auth;
 
 import com.example.notes.application.coolproject.dto.auth.AuthResponse;
 import com.example.notes.application.coolproject.dto.auth.LoginRequest;

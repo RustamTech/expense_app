@@ -13,15 +13,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.notes.application.coolproject.config.SecurityConfig;
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseCreateRequest;
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseResponse;
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseUpdateRequest;
+import com.example.notes.application.coolproject.dto.expense.ExpenseCreateRequest;
+import com.example.notes.application.coolproject.dto.expense.ExpenseResponse;
+import com.example.notes.application.coolproject.dto.expense.ExpenseUpdateRequest;
 import com.example.notes.application.coolproject.enums.CurrencyType;
 import com.example.notes.application.coolproject.enums.StatusType;
 import com.example.notes.application.coolproject.exception.custom.ExpenseNotFoundException;
+import com.example.notes.application.coolproject.security.JwtService;
+import com.example.notes.application.coolproject.security.UserDetailsServiceImpl;
 import com.example.notes.application.coolproject.service.expense.ExpenseService;
-import com.example.notes.application.coolproject.service.security.JwtService;
-import com.example.notes.application.coolproject.service.security.UserDetailsServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;

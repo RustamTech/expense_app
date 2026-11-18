@@ -1,6 +1,6 @@
-package com.example.notes.application.coolproject.dto.expenseDto;
+package com.example.notes.application.coolproject.dto.expense;
 
-import com.example.notes.application.coolproject.dto.categoryDto.CategoryResponse;
+import com.example.notes.application.coolproject.dto.category.CategoryResponse;
 import com.example.notes.application.coolproject.enums.CurrencyType;
 import com.example.notes.application.coolproject.enums.StatusType;
 import java.math.BigDecimal;

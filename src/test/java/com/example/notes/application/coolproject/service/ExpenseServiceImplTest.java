@@ -7,9 +7,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseCreateRequest;
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseResponse;
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseUpdateRequest;
+import com.example.notes.application.coolproject.dto.expense.ExpenseCreateRequest;
+import com.example.notes.application.coolproject.dto.expense.ExpenseResponse;
+import com.example.notes.application.coolproject.dto.expense.ExpenseUpdateRequest;
 import com.example.notes.application.coolproject.entity.CategoryEntity;
 import com.example.notes.application.coolproject.entity.ExpenseEntity;
 import com.example.notes.application.coolproject.entity.UserEntity;

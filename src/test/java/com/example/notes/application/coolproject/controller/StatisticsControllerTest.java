@@ -7,11 +7,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.notes.application.coolproject.config.SecurityConfig;
-import com.example.notes.application.coolproject.dto.statisticsDto.StatisticsSummaryResponse;
+import com.example.notes.application.coolproject.dto.statistics.StatisticsSummaryResponse;
 import com.example.notes.application.coolproject.enums.CurrencyType;
 import com.example.notes.application.coolproject.enums.StatusType;
-import com.example.notes.application.coolproject.service.security.JwtService;
-import com.example.notes.application.coolproject.service.security.UserDetailsServiceImpl;
+import com.example.notes.application.coolproject.security.JwtService;
+import com.example.notes.application.coolproject.security.UserDetailsServiceImpl;
 import com.example.notes.application.coolproject.service.statistics.StatisticsService;
 import java.math.BigDecimal;
 import java.util.Map;

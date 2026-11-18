@@ -1,9 +1,9 @@
 package com.example.notes.application.coolproject.controller;
 
 import com.example.notes.application.coolproject.config.Endpoints;
-import com.example.notes.application.coolproject.dto.categoryDto.CategoryCreateRequest;
-import com.example.notes.application.coolproject.dto.categoryDto.CategoryResponse;
-import com.example.notes.application.coolproject.dto.categoryDto.CategoryUpdateRequest;
+import com.example.notes.application.coolproject.dto.category.CategoryCreateRequest;
+import com.example.notes.application.coolproject.dto.category.CategoryResponse;
+import com.example.notes.application.coolproject.dto.category.CategoryUpdateRequest;
 import com.example.notes.application.coolproject.service.category.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

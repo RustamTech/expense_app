@@ -1,7 +1,7 @@
 package com.example.notes.application.coolproject.controller;
 
 import com.example.notes.application.coolproject.config.Endpoints;
-import com.example.notes.application.coolproject.dto.statisticsDto.StatisticsSummaryResponse;
+import com.example.notes.application.coolproject.dto.statistics.StatisticsSummaryResponse;
 import com.example.notes.application.coolproject.service.statistics.StatisticsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

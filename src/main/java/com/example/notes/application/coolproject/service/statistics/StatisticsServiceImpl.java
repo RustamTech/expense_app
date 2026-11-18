@@ -1,6 +1,6 @@
 package com.example.notes.application.coolproject.service.statistics;
 
-import com.example.notes.application.coolproject.dto.statisticsDto.StatisticsSummaryResponse;
+import com.example.notes.application.coolproject.dto.statistics.StatisticsSummaryResponse;
 import com.example.notes.application.coolproject.entity.ExpenseEntity;
 import com.example.notes.application.coolproject.entity.UserEntity;
 import com.example.notes.application.coolproject.enums.CurrencyType;

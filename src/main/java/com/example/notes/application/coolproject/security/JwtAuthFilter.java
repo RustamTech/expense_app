@@ -1,4 +1,4 @@
-package com.example.notes.application.coolproject.service.security;
+package com.example.notes.application.coolproject.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

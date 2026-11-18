@@ -1,7 +1,7 @@
 package com.example.notes.application.coolproject.config;
 
-import com.example.notes.application.coolproject.service.security.JwtAuthFilter;
-import com.example.notes.application.coolproject.service.security.UserDetailsServiceImpl;
+import com.example.notes.application.coolproject.security.JwtAuthFilter;
+import com.example.notes.application.coolproject.security.UserDetailsServiceImpl;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;

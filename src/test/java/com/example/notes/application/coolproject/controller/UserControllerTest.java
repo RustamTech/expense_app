@@ -9,11 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.notes.application.coolproject.config.SecurityConfig;
-import com.example.notes.application.coolproject.dto.userDto.UserResponse;
-import com.example.notes.application.coolproject.dto.userDto.UserUpdateRequest;
+import com.example.notes.application.coolproject.dto.user.UserResponse;
+import com.example.notes.application.coolproject.dto.user.UserUpdateRequest;
 import com.example.notes.application.coolproject.enums.UserRole;
-import com.example.notes.application.coolproject.service.security.JwtService;
-import com.example.notes.application.coolproject.service.security.UserDetailsServiceImpl;
+import com.example.notes.application.coolproject.security.JwtService;
+import com.example.notes.application.coolproject.security.UserDetailsServiceImpl;
 import com.example.notes.application.coolproject.service.user.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;

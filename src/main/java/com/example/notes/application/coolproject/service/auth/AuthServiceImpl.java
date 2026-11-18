@@ -1,4 +1,4 @@
-package com.example.notes.application.coolproject.service.security;
+package com.example.notes.application.coolproject.service.auth;
 
 import com.example.notes.application.coolproject.dto.auth.AuthResponse;
 import com.example.notes.application.coolproject.dto.auth.LoginRequest;
@@ -8,6 +8,7 @@ import com.example.notes.application.coolproject.enums.UserRole;
 import com.example.notes.application.coolproject.exception.custom.ResourceAlreadyExistsException;
 import com.example.notes.application.coolproject.exception.custom.UserNotFoundException;
 import com.example.notes.application.coolproject.repository.UserRepository;
+import com.example.notes.application.coolproject.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;

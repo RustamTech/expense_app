@@ -1,4 +1,4 @@
-package com.example.notes.application.coolproject.dto.statisticsDto;
+package com.example.notes.application.coolproject.dto.statistics;
 
 import com.example.notes.application.coolproject.enums.CurrencyType;
 import com.example.notes.application.coolproject.enums.StatusType;

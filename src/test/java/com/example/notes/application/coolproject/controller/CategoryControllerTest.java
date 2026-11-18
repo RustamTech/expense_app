@@ -13,14 +13,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.notes.application.coolproject.config.SecurityConfig;
-import com.example.notes.application.coolproject.dto.categoryDto.CategoryCreateRequest;
-import com.example.notes.application.coolproject.dto.categoryDto.CategoryResponse;
-import com.example.notes.application.coolproject.dto.categoryDto.CategoryUpdateRequest;
+import com.example.notes.application.coolproject.dto.category.CategoryCreateRequest;
+import com.example.notes.application.coolproject.dto.category.CategoryResponse;
+import com.example.notes.application.coolproject.dto.category.CategoryUpdateRequest;
 import com.example.notes.application.coolproject.enums.CategoryType;
 import com.example.notes.application.coolproject.exception.custom.CategoryNotFoundException;
+import com.example.notes.application.coolproject.security.JwtService;
+import com.example.notes.application.coolproject.security.UserDetailsServiceImpl;
 import com.example.notes.application.coolproject.service.category.CategoryService;
-import com.example.notes.application.coolproject.service.security.JwtService;
-import com.example.notes.application.coolproject.service.security.UserDetailsServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;

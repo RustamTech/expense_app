@@ -4,7 +4,7 @@ import com.example.notes.application.coolproject.config.Endpoints;
 import com.example.notes.application.coolproject.dto.auth.AuthResponse;
 import com.example.notes.application.coolproject.dto.auth.LoginRequest;
 import com.example.notes.application.coolproject.dto.auth.RegisterRequest;
-import com.example.notes.application.coolproject.service.security.AuthService;
+import com.example.notes.application.coolproject.service.auth.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

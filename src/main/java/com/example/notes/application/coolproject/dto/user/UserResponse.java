@@ -1,4 +1,4 @@
-package com.example.notes.application.coolproject.dto.userDto;
+package com.example.notes.application.coolproject.dto.user;
 
 import com.example.notes.application.coolproject.enums.UserRole;
 import java.time.LocalDateTime;

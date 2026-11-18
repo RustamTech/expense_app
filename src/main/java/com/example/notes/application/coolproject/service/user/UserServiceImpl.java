@@ -1,7 +1,7 @@
 package com.example.notes.application.coolproject.service.user;
 
-import com.example.notes.application.coolproject.dto.userDto.UserResponse;
-import com.example.notes.application.coolproject.dto.userDto.UserUpdateRequest;
+import com.example.notes.application.coolproject.dto.user.UserResponse;
+import com.example.notes.application.coolproject.dto.user.UserUpdateRequest;
 import com.example.notes.application.coolproject.entity.UserEntity;
 import com.example.notes.application.coolproject.exception.custom.UserNotFoundException;
 import com.example.notes.application.coolproject.mapper.UserMapper;

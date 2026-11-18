@@ -1,8 +1,8 @@
 package com.example.notes.application.coolproject.controller;
 
 import com.example.notes.application.coolproject.config.Endpoints;
-import com.example.notes.application.coolproject.dto.userDto.UserResponse;
-import com.example.notes.application.coolproject.dto.userDto.UserUpdateRequest;
+import com.example.notes.application.coolproject.dto.user.UserResponse;
+import com.example.notes.application.coolproject.dto.user.UserUpdateRequest;
 import com.example.notes.application.coolproject.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

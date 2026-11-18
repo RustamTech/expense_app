@@ -1,8 +1,8 @@
 package com.example.notes.application.coolproject.mapper;
 
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseCreateRequest;
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseResponse;
-import com.example.notes.application.coolproject.dto.expenseDto.ExpenseUpdateRequest;
+import com.example.notes.application.coolproject.dto.expense.ExpenseCreateRequest;
+import com.example.notes.application.coolproject.dto.expense.ExpenseResponse;
+import com.example.notes.application.coolproject.dto.expense.ExpenseUpdateRequest;
 import com.example.notes.application.coolproject.entity.ExpenseEntity;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;

@@ -1,4 +1,4 @@
-package com.example.notes.application.coolproject.service.security;
+package com.example.notes.application.coolproject.security;
 
 import com.example.notes.application.coolproject.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

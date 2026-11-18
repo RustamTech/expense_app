@@ -3,7 +3,7 @@ package com.example.notes.application.coolproject.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import com.example.notes.application.coolproject.dto.statisticsDto.StatisticsSummaryResponse;
+import com.example.notes.application.coolproject.dto.statistics.StatisticsSummaryResponse;
 import com.example.notes.application.coolproject.entity.CategoryEntity;
 import com.example.notes.application.coolproject.entity.ExpenseEntity;
 import com.example.notes.application.coolproject.entity.UserEntity;
