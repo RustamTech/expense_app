@@ -2,28 +2,31 @@ package com.example.notes.application.coolproject.security;
 
 import com.example.notes.application.coolproject.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-@Slf4j
+/**
+ * Loads users for Spring Security by email. Used both by the login flow (through the
+ * auto-configured {@code DaoAuthenticationProvider}) and by {@link JwtAuthFilter}.
+ */
 @Service
 @RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
 
   private final UserRepository userRepository;
 
+  /**
+   * {@inheritDoc}
+   *
+   * @param email email of the user, case-insensitive
+   * @throws UsernameNotFoundException if no user has this email
+   */
   @Override
-  public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-    log.info("Loading user by email: {}", email);
+  public UserDetails loadUserByUsername(String email) {
     return userRepository
-        .findByEmail(email)
-        .orElseThrow(
-            () -> {
-              log.error("User not found with this email: {}", email);
-              return new UsernameNotFoundException("User not found with this email: " + email);
-            });
+        .findByEmail(EmailNormalizer.normalize(email))
+        .orElseThrow(() -> new UsernameNotFoundException("User not found"));
   }
 }

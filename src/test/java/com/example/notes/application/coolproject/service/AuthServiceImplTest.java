@@ -1,12 +1,14 @@
 package com.example.notes.application.coolproject.service;
 
+import static com.example.notes.application.coolproject.TestData.USER_EMAIL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.notes.application.coolproject.dto.auth.AuthResponse;
+import com.example.notes.application.coolproject.TestData;
 import com.example.notes.application.coolproject.dto.auth.LoginRequest;
 import com.example.notes.application.coolproject.dto.auth.RegisterRequest;
 import com.example.notes.application.coolproject.entity.UserEntity;
@@ -15,7 +17,6 @@ import com.example.notes.application.coolproject.exception.custom.ResourceAlread
 import com.example.notes.application.coolproject.repository.UserRepository;
 import com.example.notes.application.coolproject.security.JwtService;
 import com.example.notes.application.coolproject.service.auth.AuthServiceImpl;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -23,6 +24,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -30,72 +32,66 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class AuthServiceImplTest {
 
   @Mock private UserRepository userRepository;
-
   @Mock private PasswordEncoder passwordEncoder;
-
   @Mock private JwtService jwtService;
-
   @Mock private AuthenticationManager authenticationManager;
 
   @InjectMocks private AuthServiceImpl authService;
 
   @Test
-  void register_newEmail_savesUserAndReturnsToken() {
-    RegisterRequest request =
-        new RegisterRequest("John", "Doe", "john@test.com", "+1234567890", "password123");
-    UserEntity saved = buildUser("john@test.com");
+  void registerCreatesEnabledUserWithNormalizedEmailAndHashedPassword() {
+    var request =
+        new RegisterRequest(" John ", "Doe", "  User@Example.COM", "+994501234567", "password1");
+    when(userRepository.existsByEmail(USER_EMAIL)).thenReturn(false);
+    when(passwordEncoder.encode("password1")).thenReturn("hashed");
+    when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(jwtService.generateToken(any())).thenReturn("jwt");
 
-    when(userRepository.existsByEmail("john@test.com")).thenReturn(false);
-    when(passwordEncoder.encode("password123")).thenReturn("hashed");
-    when(userRepository.save(any(UserEntity.class))).thenReturn(saved);
-    when(jwtService.generateToken(saved)).thenReturn("jwt-token");
+    var response = authService.register(request);
 
-    AuthResponse response = authService.register(request);
-
-    assertThat(response.token()).isEqualTo("jwt-token");
-    assertThat(response.email()).isEqualTo("john@test.com");
-
-    ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
-    verify(userRepository).save(captor.capture());
-    UserEntity captured = captor.getValue();
-    assertThat(captured.getUserRole()).isEqualTo(UserRole.USER);
-    assertThat(captured.isEnabled()).isTrue();
+    var saved = ArgumentCaptor.forClass(UserEntity.class);
+    verify(userRepository).save(saved.capture());
+    assertThat(saved.getValue().getEmail()).isEqualTo(USER_EMAIL);
+    assertThat(saved.getValue().getFirstName()).isEqualTo("John");
+    assertThat(saved.getValue().getPassword()).isEqualTo("hashed");
+    assertThat(saved.getValue().getUserRole()).isEqualTo(UserRole.USER);
+    assertThat(saved.getValue().isEnabled()).isTrue();
+    assertThat(response.token()).isEqualTo("jwt");
+    assertThat(response.role()).isEqualTo(UserRole.USER);
   }
 
   @Test
-  void register_duplicateEmail_throwsResourceAlreadyExistsException() {
-    RegisterRequest request =
-        new RegisterRequest("John", "Doe", "john@test.com", "+1234567890", "password123");
-    when(userRepository.existsByEmail("john@test.com")).thenReturn(true);
+  void registerWithTakenEmailThrowsAndSavesNothing() {
+    var request = new RegisterRequest("John", "Doe", USER_EMAIL, "+994501234567", "password1");
+    when(userRepository.existsByEmail(USER_EMAIL)).thenReturn(true);
 
     assertThatThrownBy(() -> authService.register(request))
         .isInstanceOf(ResourceAlreadyExistsException.class);
+    verify(userRepository, never()).save(any());
   }
 
   @Test
-  void login_validCredentials_returnsToken() {
-    LoginRequest request = new LoginRequest("john@test.com", "password123");
-    UserEntity user = buildUser("john@test.com");
+  void loginAuthenticatesNormalizedEmailAndReturnsTokenOfPrincipal() {
+    UserEntity user = TestData.regularUser();
+    var expectedCredentials = new UsernamePasswordAuthenticationToken(USER_EMAIL, "password1");
+    when(authenticationManager.authenticate(expectedCredentials))
+        .thenReturn(new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities()));
+    when(jwtService.generateToken(user)).thenReturn("jwt");
 
-    when(userRepository.findByEmail("john@test.com")).thenReturn(Optional.of(user));
-    when(jwtService.generateToken(user)).thenReturn("jwt-token");
+    var response = authService.login(new LoginRequest("USER@example.com", "password1"));
 
-    AuthResponse response = authService.login(request);
-
-    assertThat(response.token()).isEqualTo("jwt-token");
-    verify(authenticationManager)
-        .authenticate(new UsernamePasswordAuthenticationToken("john@test.com", "password123"));
+    assertThat(response.token()).isEqualTo("jwt");
+    assertThat(response.email()).isEqualTo(USER_EMAIL);
+    verify(userRepository, never()).findByEmail(any());
   }
 
-  private UserEntity buildUser(String email) {
-    UserEntity user = new UserEntity();
-    user.setFirstName("John");
-    user.setLastName("Doe");
-    user.setEmail(email);
-    user.setPhoneNumber("+1234567890");
-    user.setPassword("hashed");
-    user.setUserRole(UserRole.USER);
-    user.setEnabled(true);
-    return user;
+  @Test
+  void loginWithWrongPasswordPropagatesAuthenticationFailure() {
+    when(authenticationManager.authenticate(any()))
+        .thenThrow(new BadCredentialsException("Bad credentials"));
+
+    assertThatThrownBy(() -> authService.login(new LoginRequest(USER_EMAIL, "wrong")))
+        .isInstanceOf(BadCredentialsException.class);
+    verify(jwtService, never()).generateToken(any());
   }
 }

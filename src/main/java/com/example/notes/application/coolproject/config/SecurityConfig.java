@@ -1,16 +1,14 @@
 package com.example.notes.application.coolproject.config;
 
+import com.example.notes.application.coolproject.enums.UserRole;
 import com.example.notes.application.coolproject.security.InvalidTokenException;
 import com.example.notes.application.coolproject.security.JwtAuthFilter;
-import com.example.notes.application.coolproject.security.UserDetailsServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -24,7 +22,16 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * Stateless JWT security.
+ * Stateless JWT security with two roles.
+ *
+ * <table>
+ *   <caption>Access rules</caption>
+ *   <tr><th>Path</th><th>Access</th></tr>
+ *   <tr><td>{@code /auth/**}, Swagger, {@code /error}</td><td>everyone</td></tr>
+ *   <tr><td>{@code /admin/**}</td><td>{@code ADMIN}</td></tr>
+ *   <tr><td>{@code POST/PUT/DELETE /categories/**}</td><td>{@code ADMIN}</td></tr>
+ *   <tr><td>everything else</td><td>any authenticated user</td></tr>
+ * </table>
  *
  * <p>401 and 403 are not written here: both are delegated to the MVC {@link
  * HandlerExceptionResolver}, so {@code GlobalExceptionHandler} renders them in the same
@@ -32,16 +39,16 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  */
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
 
-  private final JwtAuthFilter jwtAuthFilter;
-  private final UserDetailsServiceImpl userDetailsService;
+  private static final String ADMIN = UserRole.ADMIN.name();
+  private static final String CATEGORY_PATHS = Endpoints.CATEGORIES + Endpoints.ALL_SUBPATHS;
 
   /**
    * Builds the security filter chain.
    *
    * @param http security builder
+   * @param jwtAuthFilter filter that authenticates bearer tokens
    * @param exceptionResolver MVC resolver used to render 401/403 responses
    * @return the configured filter chain
    * @throws Exception if the builder fails
@@ -49,27 +56,27 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain securityFilterChain(
       HttpSecurity http,
+      JwtAuthFilter jwtAuthFilter,
       @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver)
       throws Exception {
-    http.csrf(AbstractHttpConfigurer::disable)
+    return http.csrf(AbstractHttpConfigurer::disable)
+        .httpBasic(AbstractHttpConfigurer::disable)
+        .formLogin(AbstractHttpConfigurer::disable)
+        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(
-                        "/api/notes/auth/**",
-                        "/swagger-ui/**",
-                        "/swagger-ui.html",
-                        "/swagger-ui/index.html",
-                        "/v3/api-docs/**",
-                        "/api-docs/**",
-                        "/api-docs/swagger-config",
-                        "/swagger-resources/**",
-                        "/webjars/**",
-                        "/error")
+                auth.requestMatchers(Endpoints.PUBLIC)
                     .permitAll()
+                    .requestMatchers(Endpoints.ADMIN + Endpoints.ALL_SUBPATHS)
+                    .hasRole(ADMIN)
+                    .requestMatchers(HttpMethod.POST, Endpoints.CATEGORIES, CATEGORY_PATHS)
+                    .hasRole(ADMIN)
+                    .requestMatchers(HttpMethod.PUT, CATEGORY_PATHS)
+                    .hasRole(ADMIN)
+                    .requestMatchers(HttpMethod.DELETE, CATEGORY_PATHS)
+                    .hasRole(ADMIN)
                     .anyRequest()
                     .authenticated())
-        .sessionManagement(
-            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(
             ex ->
                 ex.authenticationEntryPoint(
@@ -80,25 +87,29 @@ public class SecurityConfig {
                         (request, response, deniedException) ->
                             exceptionResolver.resolveException(
                                 request, response, null, deniedException)))
-        .authenticationProvider(authenticationProvider())
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-    return http.build();
+        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+        .build();
   }
 
-  @Bean
-  public AuthenticationProvider authenticationProvider() {
-    DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-    provider.setUserDetailsService(userDetailsService);
-    provider.setPasswordEncoder(passwordEncoder());
-    return provider;
-  }
-
+  /**
+   * Exposes the authentication manager auto-configured from the {@code UserDetailsService} and
+   * {@link PasswordEncoder} beans; used by the login flow.
+   *
+   * @param config Spring Security authentication configuration
+   * @return the authentication manager
+   * @throws Exception if the manager cannot be built
+   */
   @Bean
   public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
       throws Exception {
     return config.getAuthenticationManager();
   }
 
+  /**
+   * Password hashing used for registration and login.
+   *
+   * @return a BCrypt encoder
+   */
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();

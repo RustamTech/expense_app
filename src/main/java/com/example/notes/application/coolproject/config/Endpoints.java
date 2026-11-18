@@ -1,10 +1,14 @@
 package com.example.notes.application.coolproject.config;
 
+/**
+ * Single source of truth for API paths. Class-level constants are full prefixes used in
+ * {@code @RequestMapping}; the remaining constants are relative to their prefix.
+ */
 public final class Endpoints {
 
   private Endpoints() {}
 
-  // MAIN
+  /** Root of the whole API. */
   public static final String MAIN = "/api/notes";
 
   // ─── AUTH ───────────────────────────────────────────
@@ -29,4 +33,20 @@ public final class Endpoints {
   // ─── STATISTICS ──────────────────────────────────────
   public static final String STATISTICS = MAIN + "/statistics";
   public static final String STATISTICS_SUMMARY = "/summary";
+
+  // ─── ADMIN ───────────────────────────────────────────
+  public static final String ADMIN = MAIN + "/admin";
+  public static final String ADMIN_USERS = ADMIN + "/users";
+  public static final String ADMIN_USER_BY_ID = "/{id}";
+  public static final String ADMIN_USER_ROLE = "/{id}/role";
+  public static final String ADMIN_USER_STATUS = "/{id}/status";
+
+  // ─── SECURITY MATCHERS ───────────────────────────────
+  /** Ant pattern matching every sub-path of a prefix. */
+  public static final String ALL_SUBPATHS = "/**";
+
+  /** Paths reachable without authentication. */
+  static final String[] PUBLIC = {
+    AUTH + ALL_SUBPATHS, "/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/error"
+  };
 }

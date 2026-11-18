@@ -1,5 +1,6 @@
 package com.example.notes.application.coolproject.controller;
 
+import static com.example.notes.application.coolproject.TestData.USER_EMAIL;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,7 +31,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @WebMvcTest(ExpenseController.class)
 class ErrorHandlingTest extends AbstractControllerTest {
 
-  private static final String USER_EMAIL = "user@example.com";
   private static final String EXPENSES = "/api/notes/expenses";
   private static final String PROBLEM_JSON = "application/problem+json";
 

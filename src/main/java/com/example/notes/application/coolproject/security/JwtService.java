@@ -1,77 +1,78 @@
 package com.example.notes.application.coolproject.security;
 
-import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import java.security.Key;
+import java.time.Instant;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Function;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import javax.crypto.SecretKey;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-@Slf4j
+/**
+ * Issues and verifies HMAC-signed JWT access tokens. The subject of a token is the user email.
+ *
+ * <p>The signing key is decoded once at construction; a key shorter than 256 bits fails startup.
+ */
 @Service
 public class JwtService {
 
-  @Value("${jwt.secret}")
-  private String secretKey;
+  private final SecretKey signingKey;
+  private final JwtProperties properties;
 
-  @Value("${jwt.expiration}")
-  private long expiration;
-
-  public String generateToken(UserDetails userDetails) {
-    log.info("Generating token for user: {}", userDetails.getUsername());
-    return generateToken(new HashMap<>(), userDetails);
+  /**
+   * Creates the service.
+   *
+   * @param properties validated JWT settings
+   * @throws io.jsonwebtoken.security.WeakKeyException if the secret is shorter than 256 bits
+   */
+  public JwtService(JwtProperties properties) {
+    this.properties = properties;
+    this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(properties.secret()));
   }
 
-  public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
+  /**
+   * Issues a token for the given user.
+   *
+   * @param userDetails the authenticated user
+   * @return compact signed JWT whose subject is {@link UserDetails#getUsername()}
+   */
+  public String generateToken(UserDetails userDetails) {
+    Instant now = Instant.now();
     return Jwts.builder()
-        .claims(extraClaims)
         .subject(userDetails.getUsername())
-        .issuedAt(new Date(System.currentTimeMillis()))
-        .expiration(new Date(System.currentTimeMillis() + expiration))
-        .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+        .issuedAt(Date.from(now))
+        .expiration(Date.from(now.plus(properties.expiration())))
+        .signWith(signingKey)
         .compact();
   }
 
-  public boolean isTokenValid(String token, UserDetails userDetails) {
-    final String email = extractEmail(token);
-    return email.equals(userDetails.getUsername()) && !isTokenExpired(token);
-  }
-
+  /**
+   * Verifies the token and returns its subject.
+   *
+   * @param token compact JWT
+   * @return the email stored as the subject
+   * @throws JwtException if the token is malformed, badly signed or expired
+   */
   public String extractEmail(String token) {
-    return extractClaim(token, Claims::getSubject);
-  }
-
-  private boolean isTokenExpired(String token) {
-    return extractExpiration(token).before(new Date());
-  }
-
-  private Date extractExpiration(String token) {
-    return extractClaim(token, Claims::getExpiration);
-  }
-
-  public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-    final Claims claims = extractAllClaims(token);
-    return claimsResolver.apply(claims);
-  }
-
-  private Claims extractAllClaims(String token) {
     return Jwts.parser()
-        .verifyWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKey)))
+        .verifyWith(signingKey)
         .build()
         .parseSignedClaims(token)
-        .getPayload();
+        .getPayload()
+        .getSubject();
   }
 
-  private Key getSigningKey() {
-    byte[] keyBytes = Decoders.BASE64.decode(secretKey);
-    return Keys.hmacShaKeyFor(keyBytes);
+  /**
+   * Checks that a verified token belongs to the given, still enabled, user.
+   *
+   * @param token compact JWT
+   * @param userDetails the user the token claims to belong to
+   * @return {@code true} if the subject matches and the account is enabled
+   * @throws JwtException if the token is malformed, badly signed or expired
+   */
+  public boolean isTokenValid(String token, UserDetails userDetails) {
+    return extractEmail(token).equals(userDetails.getUsername()) && userDetails.isEnabled();
   }
 }

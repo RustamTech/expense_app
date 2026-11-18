@@ -1,111 +1,104 @@
 package com.example.notes.application.coolproject.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.notes.application.coolproject.config.SecurityConfig;
 import com.example.notes.application.coolproject.dto.auth.AuthResponse;
 import com.example.notes.application.coolproject.dto.auth.LoginRequest;
 import com.example.notes.application.coolproject.dto.auth.RegisterRequest;
-import com.example.notes.application.coolproject.security.JwtService;
-import com.example.notes.application.coolproject.security.UserDetailsServiceImpl;
+import com.example.notes.application.coolproject.enums.UserRole;
+import com.example.notes.application.coolproject.exception.custom.ResourceAlreadyExistsException;
 import com.example.notes.application.coolproject.service.auth.AuthService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @WebMvcTest(AuthController.class)
-@Import(SecurityConfig.class)
-class AuthControllerTest {
+class AuthControllerTest extends AbstractControllerTest {
 
-  @Autowired private MockMvc mockMvc;
+  private static final String REGISTER = "/api/notes/auth/register";
+  private static final String LOGIN = "/api/notes/auth/login";
+  private static final AuthResponse TOKEN =
+      new AuthResponse("jwt", "user@example.com", "John", "Doe", UserRole.USER);
 
-  @Autowired private ObjectMapper objectMapper;
-
-  @MockBean private AuthService authService;
-
-  @MockBean private JwtService jwtService;
-
-  @MockBean private UserDetailsServiceImpl userDetailsService;
+  @MockitoBean private AuthService authService;
 
   @Test
-  void register_validRequest_returns201() throws Exception {
-    RegisterRequest request =
-        new RegisterRequest("John", "Doe", "john@test.com", "+1234567890", "password123");
-    AuthResponse response = new AuthResponse("jwt-token", "john@test.com", "John", "Doe");
-
-    when(authService.register(any())).thenReturn(response);
+  void registerWithoutTokenReturns201AndToken() throws Exception {
+    when(authService.register(any())).thenReturn(TOKEN);
 
     mockMvc
-        .perform(
-            post("/api/notes/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+        .perform(post(REGISTER).contentType(JSON).content(json(validRegistration())))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.token").value("jwt-token"))
-        .andExpect(jsonPath("$.email").value("john@test.com"));
+        .andExpect(jsonPath("$.token").value("jwt"))
+        .andExpect(jsonPath("$.role").value("USER"));
   }
 
   @Test
-  void register_blankFirstName_returns400() throws Exception {
-    RegisterRequest request =
-        new RegisterRequest("", "Doe", "john@test.com", "+1234567890", "password123");
+  void registerWithInvalidFieldsReturns400AndSkipsService() throws Exception {
+    var request = new RegisterRequest("", "Doe", "not-an-email", "abc", "short");
 
     mockMvc
-        .perform(
-            post("/api/notes/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isBadRequest());
+        .perform(post(REGISTER).contentType(JSON).content(json(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.errors.length()").value(4));
+    verifyNoInteractions(authService);
   }
 
   @Test
-  void register_invalidEmail_returns400() throws Exception {
-    RegisterRequest request =
-        new RegisterRequest("John", "Doe", "not-an-email", "+1234567890", "password123");
+  void registerWithTakenEmailReturns409() throws Exception {
+    when(authService.register(any()))
+        .thenThrow(new ResourceAlreadyExistsException("Email is already registered"));
 
     mockMvc
-        .perform(
-            post("/api/notes/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isBadRequest());
+        .perform(post(REGISTER).contentType(JSON).content(json(validRegistration())))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("RESOURCE_ALREADY_EXISTS"));
   }
 
   @Test
-  void register_shortPassword_returns400() throws Exception {
-    RegisterRequest request =
-        new RegisterRequest("John", "Doe", "john@test.com", "+1234567890", "short");
+  void loginWithValidCredentialsReturns200() throws Exception {
+    when(authService.login(any())).thenReturn(TOKEN);
 
     mockMvc
-        .perform(
-            post("/api/notes/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  void login_validRequest_returns200() throws Exception {
-    LoginRequest request = new LoginRequest("john@test.com", "password123");
-    AuthResponse response = new AuthResponse("jwt-token", "john@test.com", "John", "Doe");
-
-    when(authService.login(any())).thenReturn(response);
-
-    mockMvc
-        .perform(
-            post("/api/notes/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+        .perform(post(LOGIN).contentType(JSON).content(json(validLogin())))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.token").value("jwt-token"));
+        .andExpect(jsonPath("$.token").value("jwt"));
+  }
+
+  @Test
+  void loginWithWrongPasswordReturns401InvalidCredentials() throws Exception {
+    when(authService.login(any())).thenThrow(new BadCredentialsException("Bad credentials"));
+
+    mockMvc
+        .perform(post(LOGIN).contentType(JSON).content(json(validLogin())))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"))
+        .andExpect(jsonPath("$.detail").value("Invalid email or password"));
+  }
+
+  @Test
+  void loginOfBlockedAccountLooksLikeWrongCredentials() throws Exception {
+    when(authService.login(any())).thenThrow(new DisabledException("User is disabled"));
+
+    mockMvc
+        .perform(post(LOGIN).contentType(JSON).content(json(validLogin())))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+  }
+
+  private static RegisterRequest validRegistration() {
+    return new RegisterRequest("John", "Doe", "user@example.com", "+994501234567", "password1");
+  }
+
+  private static LoginRequest validLogin() {
+    return new LoginRequest("user@example.com", "password1");
   }
 }

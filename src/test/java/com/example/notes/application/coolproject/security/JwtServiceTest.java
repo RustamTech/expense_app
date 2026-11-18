@@ -3,104 +3,95 @@ package com.example.notes.application.coolproject.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;
-import java.util.Map;
+import io.jsonwebtoken.security.WeakKeyException;
+import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * Unit tests for {@link JwtService}.
- *
- * <p>The service is instantiated directly (no Spring context): the secret and expiration that are
- * normally injected via {@code @Value} are set through reflection, so the tests stay fast and do
- * not need the database.
- */
 class JwtServiceTest {
 
-  /** Base64-encoded 256-bit HMAC key, test-only. */
+  /** Base64 of a 256-bit test-only key. */
   private static final String SECRET =
-      "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
+      "dGVzdC1vbmx5LXNlY3JldC1rZXktZm9yLWp3dC1zZXJ2aWNlLXVuaXQtdGVzdHM=";
 
   /** A different valid key, used to simulate a token signed by someone else. */
   private static final String FOREIGN_SECRET =
-      "6A586E3272357538782F413F4428472B4B6250645367566B5970404E63526655";
+      "Zm9yZWlnbi1zZWNyZXQta2V5LXRoYXQtaXMtYWxzby1sb25nLWVub3VnaC0yNTY=";
 
-  private static final long ONE_HOUR_MS = 3_600_000L;
+  private static final Duration ONE_HOUR = Duration.ofHours(1);
 
   private JwtService jwtService;
   private UserDetails user;
 
   @BeforeEach
   void setUp() {
-    jwtService = newJwtService(SECRET, ONE_HOUR_MS);
-    user = User.withUsername("user@example.com").password("ignored").roles("USER").build();
+    jwtService = new JwtService(new JwtProperties(SECRET, ONE_HOUR));
+    user = account("user@example.com", true);
   }
 
   @Test
-  void generatedTokenCarriesUserEmailAsSubject() {
+  void tokenCarriesEmailAsSubject() {
     String token = jwtService.generateToken(user);
 
     assertThat(jwtService.extractEmail(token)).isEqualTo("user@example.com");
   }
 
   @Test
-  void generatedTokenKeepsExtraClaims() {
-    String token = jwtService.generateToken(Map.of("role", "ADMIN"), user);
-
-    String role = jwtService.extractClaim(token, claims -> claims.get("role", String.class));
-
-    assertThat(role).isEqualTo("ADMIN");
-  }
-
-  @Test
-  void tokenIsValidForItsOwner() {
-    String token = jwtService.generateToken(user);
-
-    assertThat(jwtService.isTokenValid(token, user)).isTrue();
+  void tokenIsValidForItsEnabledOwner() {
+    assertThat(jwtService.isTokenValid(jwtService.generateToken(user), user)).isTrue();
   }
 
   @Test
   void tokenIsInvalidForAnotherUser() {
     String token = jwtService.generateToken(user);
-    UserDetails otherUser =
-        User.withUsername("other@example.com").password("ignored").roles("USER").build();
 
-    assertThat(jwtService.isTokenValid(token, otherUser)).isFalse();
+    assertThat(jwtService.isTokenValid(token, account("other@example.com", true))).isFalse();
+  }
+
+  @Test
+  void tokenOfBlockedUserIsInvalid() {
+    String token = jwtService.generateToken(user);
+
+    assertThat(jwtService.isTokenValid(token, account("user@example.com", false))).isFalse();
   }
 
   @Test
   void expiredTokenIsRejected() {
-    JwtService expiringService = newJwtService(SECRET, -1_000L);
-    String expiredToken = expiringService.generateToken(user);
+    var expiring = new JwtService(new JwtProperties(SECRET, Duration.ofSeconds(-1)));
+    String expired = expiring.generateToken(user);
 
-    assertThatThrownBy(() -> jwtService.isTokenValid(expiredToken, user))
+    assertThatThrownBy(() -> jwtService.extractEmail(expired))
         .isInstanceOf(ExpiredJwtException.class);
   }
 
   @Test
   void tokenSignedWithForeignKeyIsRejected() {
-    String foreignToken = newJwtService(FOREIGN_SECRET, ONE_HOUR_MS).generateToken(user);
+    String foreign =
+        new JwtService(new JwtProperties(FOREIGN_SECRET, ONE_HOUR)).generateToken(user);
 
-    assertThatThrownBy(() -> jwtService.extractClaim(foreignToken, Claims::getSubject))
+    assertThatThrownBy(() -> jwtService.extractEmail(foreign))
         .isInstanceOf(SignatureException.class);
   }
 
-  /**
-   * Creates a {@link JwtService} with the given configuration, mimicking {@code @Value} injection.
-   *
-   * @param secret Base64-encoded HMAC key
-   * @param expirationMs token lifetime in milliseconds (negative to produce an expired token)
-   * @return a ready-to-use service instance
-   */
-  private static JwtService newJwtService(String secret, long expirationMs) {
-    JwtService service = new JwtService();
-    ReflectionTestUtils.setField(service, "secretKey", secret);
-    ReflectionTestUtils.setField(service, "expiration", expirationMs);
-    return service;
+  @Test
+  void garbageTokenIsRejected() {
+    assertThatThrownBy(() -> jwtService.extractEmail("not-a-jwt"))
+        .isInstanceOf(MalformedJwtException.class);
+  }
+
+  @Test
+  void keyShorterThan256BitsFailsStartup() {
+    var weak = new JwtProperties("c2hvcnQ=", ONE_HOUR);
+
+    assertThatThrownBy(() -> new JwtService(weak)).isInstanceOf(WeakKeyException.class);
+  }
+
+  private static UserDetails account(String email, boolean enabled) {
+    return User.withUsername(email).password("x").roles("USER").disabled(!enabled).build();
   }
 }

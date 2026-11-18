@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -71,6 +72,29 @@ class CategoryControllerTest extends AbstractControllerTest {
           .perform(get(CATEGORIES + "/99"))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.code").value("CATEGORY_NOT_FOUND"));
+    }
+
+    @Test
+    void cannotCreate() throws Exception {
+      mockMvc
+          .perform(post(CATEGORIES).contentType(JSON).content(json(CREATE)))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+      verifyNoInteractions(categoryService);
+    }
+
+    @Test
+    void cannotUpdate() throws Exception {
+      mockMvc
+          .perform(put(CATEGORIES + "/1").contentType(JSON).content(json(UPDATE)))
+          .andExpect(status().isForbidden());
+      verifyNoInteractions(categoryService);
+    }
+
+    @Test
+    void cannotDelete() throws Exception {
+      mockMvc.perform(delete(CATEGORIES + "/1")).andExpect(status().isForbidden());
+      verifyNoInteractions(categoryService);
     }
   }
 
