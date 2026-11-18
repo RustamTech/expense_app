@@ -31,7 +31,9 @@ public class ExpenseServiceImpl implements ExpenseService {
   private final UserRepository userRepository;
 
   private UserEntity getUser(String email) {
-    return userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
+    return userRepository
+        .findByEmail(email)
+        .orElseThrow(() -> UserNotFoundException.byEmail(email));
   }
 
   @Override

@@ -24,7 +24,7 @@ public class UserServiceImpl implements UserService {
   public UserResponse getCurrentUser(String email) {
     log.info("Fetching profile for user: {}", email);
     UserEntity user =
-        userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
+        userRepository.findByEmail(email).orElseThrow(() -> UserNotFoundException.byEmail(email));
     return userMapper.toResponse(user);
   }
 
@@ -33,7 +33,7 @@ public class UserServiceImpl implements UserService {
   public UserResponse updateCurrentUser(String email, UserUpdateRequest request) {
     log.info("Updating profile for user: {}", email);
     UserEntity user =
-        userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
+        userRepository.findByEmail(email).orElseThrow(() -> UserNotFoundException.byEmail(email));
     user.setFirstName(request.firstName());
     user.setLastName(request.lastName());
     user.setPhoneNumber(request.phoneNumber());

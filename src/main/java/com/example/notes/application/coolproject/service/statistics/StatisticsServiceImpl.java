@@ -30,7 +30,7 @@ public class StatisticsServiceImpl implements StatisticsService {
   public StatisticsSummaryResponse getSummary(String email) {
     log.info("Generating statistics summary");
     UserEntity user =
-        userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
+        userRepository.findByEmail(email).orElseThrow(() -> UserNotFoundException.byEmail(email));
     List<ExpenseEntity> all = expenseRepository.findAllByUser_Id(user.getId());
 
     BigDecimal total =
