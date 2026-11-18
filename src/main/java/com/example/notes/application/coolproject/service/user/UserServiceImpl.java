@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** {@inheritDoc} */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -19,26 +20,28 @@ public class UserServiceImpl implements UserService {
   private final UserRepository userRepository;
   private final UserMapper userMapper;
 
+  /** {@inheritDoc} */
   @Override
   @Transactional(readOnly = true)
   public UserResponse getCurrentUser(String email) {
-    log.info("Fetching profile for user: {}", email);
-    UserEntity user =
-        userRepository.findByEmail(email).orElseThrow(() -> UserNotFoundException.byEmail(email));
-    return userMapper.toResponse(user);
+    return userMapper.toResponse(findUser(email));
   }
 
+  /** {@inheritDoc} Changes are flushed by the transaction; no explicit save is needed. */
   @Override
   @Transactional
   public UserResponse updateCurrentUser(String email, UserUpdateRequest request) {
-    log.info("Updating profile for user: {}", email);
-    UserEntity user =
-        userRepository.findByEmail(email).orElseThrow(() -> UserNotFoundException.byEmail(email));
-    user.setFirstName(request.firstName());
-    user.setLastName(request.lastName());
+    UserEntity user = findUser(email);
+    user.setFirstName(request.firstName().trim());
+    user.setLastName(request.lastName().trim());
     user.setPhoneNumber(request.phoneNumber());
-    UserEntity updated = userRepository.save(user);
-    log.info("Successfully updated profile for user: {}", email);
-    return userMapper.toResponse(updated);
+    log.info("Updated profile of user with id {}", user.getId());
+    return userMapper.toResponse(user);
+  }
+
+  private UserEntity findUser(String email) {
+    return userRepository
+        .findByEmail(email)
+        .orElseThrow(() -> UserNotFoundException.byEmail(email));
   }
 }

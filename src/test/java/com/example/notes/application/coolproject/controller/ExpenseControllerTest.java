@@ -1,5 +1,7 @@
 package com.example.notes.application.coolproject.controller;
 
+import static com.example.notes.application.coolproject.TestData.USER_EMAIL;
+import static com.example.notes.application.coolproject.TestData.expenseResponse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -12,203 +14,161 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.notes.application.coolproject.config.SecurityConfig;
+import com.example.notes.application.coolproject.TestData;
 import com.example.notes.application.coolproject.dto.expense.ExpenseCreateRequest;
-import com.example.notes.application.coolproject.dto.expense.ExpenseResponse;
 import com.example.notes.application.coolproject.dto.expense.ExpenseUpdateRequest;
 import com.example.notes.application.coolproject.enums.CurrencyType;
 import com.example.notes.application.coolproject.enums.StatusType;
+import com.example.notes.application.coolproject.exception.custom.CategoryNotFoundException;
 import com.example.notes.application.coolproject.exception.custom.ExpenseNotFoundException;
-import com.example.notes.application.coolproject.security.JwtService;
-import com.example.notes.application.coolproject.security.UserDetailsServiceImpl;
 import com.example.notes.application.coolproject.service.expense.ExpenseService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @WebMvcTest(ExpenseController.class)
-@Import(SecurityConfig.class)
-class ExpenseControllerTest {
+@WithMockUser(username = USER_EMAIL)
+class ExpenseControllerTest extends AbstractControllerTest {
 
-  @Autowired private MockMvc mockMvc;
+  private static final String EXPENSES = "/api/notes/expenses";
 
-  @Autowired private ObjectMapper objectMapper;
-
-  @MockBean private ExpenseService expenseService;
-
-  @MockBean private JwtService jwtService;
-
-  @MockBean private UserDetailsServiceImpl userDetailsService;
+  @MockitoBean private ExpenseService expenseService;
 
   @Test
-  @WithMockUser
-  void findAll_returns200WithList() throws Exception {
-    List<ExpenseResponse> expenses = List.of(buildExpenseResponse(1L), buildExpenseResponse(2L));
-    when(expenseService.findAll(any())).thenReturn(expenses);
+  void listsOwnExpensesOfCaller() throws Exception {
+    when(expenseService.findAll(USER_EMAIL))
+        .thenReturn(List.of(expenseResponse(1L), expenseResponse(2L)));
 
     mockMvc
-        .perform(get("/api/notes/expenses"))
+        .perform(get(EXPENSES))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(2));
   }
 
   @Test
-  @WithMockUser
-  void findById_existing_returns200() throws Exception {
-    ExpenseResponse response = buildExpenseResponse(1L);
-    when(expenseService.findById(any(), eq(1L))).thenReturn(response);
+  void returnsOwnExpense() throws Exception {
+    when(expenseService.findById(USER_EMAIL, 1L)).thenReturn(expenseResponse(1L));
 
     mockMvc
-        .perform(get("/api/notes/expenses/1"))
+        .perform(get(EXPENSES + "/1"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.id").value(1))
-        .andExpect(jsonPath("$.description").value("Lunch"));
+        .andExpect(jsonPath("$.description").value("Lunch"))
+        .andExpect(jsonPath("$.category.name").value("Food"));
   }
 
   @Test
-  @WithMockUser
-  void findById_notFound_returns404() throws Exception {
-    when(expenseService.findById(any(), eq(99L))).thenThrow(new ExpenseNotFoundException(99L));
-
-    mockMvc.perform(get("/api/notes/expenses/99")).andExpect(status().isNotFound());
-  }
-
-  @Test
-  @WithMockUser
-  void create_validRequest_returns201() throws Exception {
-    ExpenseCreateRequest request =
-        new ExpenseCreateRequest(
-            BigDecimal.TEN, "Lunch", null, CurrencyType.USD, LocalDate.now(), 1L, StatusType.PAID);
-    ExpenseResponse response = buildExpenseResponse(1L);
-
-    when(expenseService.create(any(), any())).thenReturn(response);
+  void foreignOrMissingExpenseReturns404() throws Exception {
+    when(expenseService.findById(USER_EMAIL, 99L)).thenThrow(new ExpenseNotFoundException(99L));
 
     mockMvc
-        .perform(
-            post("/api/notes/expenses")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+        .perform(get(EXPENSES + "/99"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("EXPENSE_NOT_FOUND"));
+  }
+
+  @Test
+  void filtersByStatus() throws Exception {
+    when(expenseService.findAllByStatus(USER_EMAIL, StatusType.PAID))
+        .thenReturn(List.of(expenseResponse(1L)));
+
+    mockMvc
+        .perform(get(EXPENSES + "/status/PAID"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1));
+  }
+
+  @Test
+  void filtersByCategory() throws Exception {
+    when(expenseService.findAllByCategory(USER_EMAIL, 1L)).thenReturn(List.of(expenseResponse(1L)));
+
+    mockMvc.perform(get(EXPENSES + "/category/1")).andExpect(status().isOk());
+  }
+
+  @Test
+  void filterByMissingCategoryReturns404() throws Exception {
+    when(expenseService.findAllByCategory(USER_EMAIL, 9L))
+        .thenThrow(new CategoryNotFoundException(9L));
+
+    mockMvc
+        .perform(get(EXPENSES + "/category/9"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("CATEGORY_NOT_FOUND"));
+  }
+
+  @Test
+  void createsExpenseForCaller() throws Exception {
+    when(expenseService.create(eq(USER_EMAIL), any())).thenReturn(expenseResponse(1L));
+
+    mockMvc
+        .perform(post(EXPENSES).contentType(JSON).content(json(validCreate())))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(1));
   }
 
   @Test
-  @WithMockUser
-  void create_negativeAmount_returns400() throws Exception {
-    ExpenseCreateRequest request =
+  void amountWithTooManyDecimalsReturns400() throws Exception {
+    var request =
         new ExpenseCreateRequest(
-            BigDecimal.valueOf(-5),
+            new BigDecimal("1.999"),
             "Lunch",
             null,
-            CurrencyType.USD,
-            LocalDate.now(),
+            CurrencyType.AZN,
+            TestData.DAY,
             1L,
             StatusType.PAID);
 
     mockMvc
-        .perform(
-            post("/api/notes/expenses")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isBadRequest());
+        .perform(post(EXPENSES).contentType(JSON).content(json(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[0].field").value("amount"));
   }
 
   @Test
-  @WithMockUser
-  void update_existingId_returns200() throws Exception {
-    ExpenseUpdateRequest request =
-        new ExpenseUpdateRequest(
-            BigDecimal.valueOf(20),
-            "Dinner",
-            null,
-            CurrencyType.EUR,
-            LocalDate.now(),
-            null,
-            StatusType.PLANNED);
-    ExpenseResponse response = buildExpenseResponse(1L);
-
-    when(expenseService.update(any(), eq(1L), any())).thenReturn(response);
+  void updatesOwnExpense() throws Exception {
+    var request =
+        new ExpenseUpdateRequest(new BigDecimal("20"), null, null, null, null, null, null);
+    when(expenseService.update(eq(USER_EMAIL), eq(1L), any())).thenReturn(expenseResponse(1L));
 
     mockMvc
-        .perform(
-            put("/api/notes/expenses/1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+        .perform(put(EXPENSES + "/1").contentType(JSON).content(json(request)))
         .andExpect(status().isOk());
   }
 
   @Test
-  @WithMockUser
-  void delete_existing_returns204() throws Exception {
-    mockMvc.perform(delete("/api/notes/expenses/1")).andExpect(status().isNoContent());
-
-    verify(expenseService).delete(any(), eq(1L));
-  }
-
-  @Test
-  @WithMockUser
-  void delete_notFound_returns404() throws Exception {
-    doThrow(new ExpenseNotFoundException(99L)).when(expenseService).delete(any(), eq(99L));
-
-    mockMvc.perform(delete("/api/notes/expenses/99")).andExpect(status().isNotFound());
-  }
-
-  @Test
-  @WithMockUser
-  void findAllByStatus_validStatus_returns200() throws Exception {
-    List<ExpenseResponse> expenses = List.of(buildExpenseResponse(1L));
-    when(expenseService.findAllByStatus(any(), eq(StatusType.PAID))).thenReturn(expenses);
+  void updateWithBlankDescriptionReturns400() throws Exception {
+    var request = new ExpenseUpdateRequest(null, " ", null, null, null, null, null);
 
     mockMvc
-        .perform(get("/api/notes/expenses/status/PAID"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(1));
+        .perform(put(EXPENSES + "/1").contentType(JSON).content(json(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[0].field").value("description"));
   }
 
   @Test
-  @WithMockUser
-  void findAllByStatus_invalidStatus_returns400() throws Exception {
-    mockMvc.perform(get("/api/notes/expenses/status/INVALID")).andExpect(status().isBadRequest());
+  void deletesOwnExpense() throws Exception {
+    mockMvc.perform(delete(EXPENSES + "/1")).andExpect(status().isNoContent());
+
+    verify(expenseService).delete(USER_EMAIL, 1L);
   }
 
   @Test
-  @WithMockUser
-  void findAllByCategory_validCategory_returns200() throws Exception {
-    List<ExpenseResponse> expenses = List.of(buildExpenseResponse(1L));
-    when(expenseService.findAllByCategory(any(), eq(1L))).thenReturn(expenses);
+  void deletingForeignExpenseReturns404() throws Exception {
+    doThrow(new ExpenseNotFoundException(5L)).when(expenseService).delete(USER_EMAIL, 5L);
 
-    mockMvc
-        .perform(get("/api/notes/expenses/category/1"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(1));
+    mockMvc.perform(delete(EXPENSES + "/5")).andExpect(status().isNotFound());
   }
 
-  @Test
-  void findAll_unauthenticated_returns401() throws Exception {
-    mockMvc.perform(get("/api/notes/expenses")).andExpect(status().isUnauthorized());
-  }
-
-  private ExpenseResponse buildExpenseResponse(Long id) {
-    return new ExpenseResponse(
-        id,
-        BigDecimal.TEN,
+  private static ExpenseCreateRequest validCreate() {
+    return new ExpenseCreateRequest(
+        new BigDecimal("12.50"),
         "Lunch",
         null,
-        LocalDate.now(),
-        null,
-        StatusType.PAID,
-        CurrencyType.USD,
-        LocalDateTime.now(),
-        LocalDateTime.now());
+        CurrencyType.AZN,
+        TestData.DAY,
+        1L,
+        StatusType.PAID);
   }
 }

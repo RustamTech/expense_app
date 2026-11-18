@@ -1,10 +1,11 @@
 package com.example.notes.application.coolproject.service;
 
+import static com.example.notes.application.coolproject.TestData.USER_EMAIL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.notes.application.coolproject.TestData;
 import com.example.notes.application.coolproject.dto.user.UserResponse;
 import com.example.notes.application.coolproject.dto.user.UserUpdateRequest;
 import com.example.notes.application.coolproject.entity.UserEntity;
@@ -13,7 +14,6 @@ import com.example.notes.application.coolproject.exception.custom.UserNotFoundEx
 import com.example.notes.application.coolproject.mapper.UserMapper;
 import com.example.notes.application.coolproject.repository.UserRepository;
 import com.example.notes.application.coolproject.service.user.UserServiceImpl;
-import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,74 +25,49 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class UserServiceImplTest {
 
   @Mock private UserRepository userRepository;
-
   @Mock private UserMapper userMapper;
 
   @InjectMocks private UserServiceImpl userService;
 
   @Test
-  void getCurrentUser_existingEmail_returnsUserResponse() {
-    UserEntity user = buildUser();
-    UserResponse response = buildUserResponse();
-
-    when(userRepository.findByEmail("john@test.com")).thenReturn(Optional.of(user));
+  void returnsProfileOfCaller() {
+    UserEntity user = TestData.regularUser();
+    UserResponse response = TestData.userResponse(1L, USER_EMAIL, UserRole.USER);
+    when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.of(user));
     when(userMapper.toResponse(user)).thenReturn(response);
 
-    UserResponse result = userService.getCurrentUser("john@test.com");
-
-    assertThat(result).isEqualTo(response);
+    assertThat(userService.getCurrentUser(USER_EMAIL)).isEqualTo(response);
   }
 
   @Test
-  void getCurrentUser_notFound_throwsUserNotFoundException() {
-    when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
+  void missingCallerThrowsUserNotFound() {
+    when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> userService.getCurrentUser("missing@test.com"))
+    assertThatThrownBy(() -> userService.getCurrentUser(USER_EMAIL))
         .isInstanceOf(UserNotFoundException.class);
   }
 
   @Test
-  void updateCurrentUser_existingUser_updatesAndReturnsResponse() {
-    UserUpdateRequest request = new UserUpdateRequest("Jane", "Smith", "+9999999999");
-    UserEntity user = buildUser();
-    UserResponse response = buildUserResponse();
+  void updatesOnlyEditableFieldsAndTrimsNames() {
+    UserEntity user = TestData.regularUser();
+    when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.of(user));
 
-    when(userRepository.findByEmail("john@test.com")).thenReturn(Optional.of(user));
-    when(userRepository.save(user)).thenReturn(user);
-    when(userMapper.toResponse(user)).thenReturn(response);
+    userService.updateCurrentUser(
+        USER_EMAIL, new UserUpdateRequest(" Jane ", "Roe", "+15550000000"));
 
-    UserResponse result = userService.updateCurrentUser("john@test.com", request);
-
-    assertThat(result).isEqualTo(response);
-    verify(userRepository).save(user);
     assertThat(user.getFirstName()).isEqualTo("Jane");
-    assertThat(user.getLastName()).isEqualTo("Smith");
-    assertThat(user.getPhoneNumber()).isEqualTo("+9999999999");
+    assertThat(user.getLastName()).isEqualTo("Roe");
+    assertThat(user.getPhoneNumber()).isEqualTo("+15550000000");
+    assertThat(user.getEmail()).isEqualTo(USER_EMAIL);
+    assertThat(user.getUserRole()).isEqualTo(UserRole.USER);
   }
 
   @Test
-  void updateCurrentUser_notFound_throwsUserNotFoundException() {
-    UserUpdateRequest request = new UserUpdateRequest("Jane", "Smith", "+9999999999");
-    when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
+  void updateOfMissingCallerThrowsUserNotFound() {
+    when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.empty());
+    var request = new UserUpdateRequest("Jane", "Roe", "+15550000000");
 
-    assertThatThrownBy(() -> userService.updateCurrentUser("missing@test.com", request))
+    assertThatThrownBy(() -> userService.updateCurrentUser(USER_EMAIL, request))
         .isInstanceOf(UserNotFoundException.class);
-  }
-
-  private UserEntity buildUser() {
-    UserEntity user = new UserEntity();
-    user.setFirstName("John");
-    user.setLastName("Doe");
-    user.setEmail("john@test.com");
-    user.setPhoneNumber("+1234567890");
-    user.setPassword("hashed");
-    user.setUserRole(UserRole.USER);
-    user.setEnabled(true);
-    return user;
-  }
-
-  private UserResponse buildUserResponse() {
-    return new UserResponse(
-        1L, "John", "Doe", "john@test.com", "+1234567890", UserRole.USER, LocalDateTime.now());
   }
 }

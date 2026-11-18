@@ -20,9 +20,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** {@inheritDoc} */
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class ExpenseServiceImpl implements ExpenseService {
 
   private final ExpenseMapper expenseMapper;
@@ -30,121 +31,95 @@ public class ExpenseServiceImpl implements ExpenseService {
   private final CategoryRepository categoryRepository;
   private final UserRepository userRepository;
 
-  private UserEntity getUser(String email) {
+  /** {@inheritDoc} */
+  @Override
+  @Transactional(readOnly = true)
+  public ExpenseResponse findById(String email, Long id) {
+    return expenseMapper.toResponse(findOwnExpense(findUser(email), id));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Transactional(readOnly = true)
+  public List<ExpenseResponse> findAll(String email) {
+    return toResponses(expenseRepository.findAllByUser_IdOrderByDateDesc(findUser(email).getId()));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Transactional(readOnly = true)
+  public List<ExpenseResponse> findAllByStatus(String email, StatusType statusType) {
+    Long userId = findUser(email).getId();
+    return toResponses(
+        expenseRepository.findAllByUser_IdAndStatusTypeOrderByDateDesc(userId, statusType));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Transactional(readOnly = true)
+  public List<ExpenseResponse> findAllByCategory(String email, Long categoryId) {
+    Long userId = findUser(email).getId();
+    if (!categoryRepository.existsById(categoryId)) {
+      throw new CategoryNotFoundException(categoryId);
+    }
+    return toResponses(
+        expenseRepository.findAllByUser_IdAndCategory_IdOrderByDateDesc(userId, categoryId));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Transactional
+  public ExpenseResponse create(String email, ExpenseCreateRequest request) {
+    UserEntity user = findUser(email);
+    ExpenseEntity expense = expenseMapper.toEntity(request);
+    expense.setCategory(findCategory(request.categoryId()));
+    expense.setUser(user);
+    ExpenseEntity saved = expenseRepository.save(expense);
+    log.info("User {} created expense {}", user.getId(), saved.getId());
+    return expenseMapper.toResponse(saved);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Transactional
+  public ExpenseResponse update(String email, Long id, ExpenseUpdateRequest request) {
+    ExpenseEntity expense = findOwnExpense(findUser(email), id);
+    if (request.categoryId() != null) {
+      expense.setCategory(findCategory(request.categoryId()));
+    }
+    expenseMapper.updateEntity(request, expense);
+    ExpenseEntity updated = expenseRepository.save(expense);
+    log.info("Updated expense {}", id);
+    return expenseMapper.toResponse(updated);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Transactional
+  public void delete(String email, Long id) {
+    expenseRepository.delete(findOwnExpense(findUser(email), id));
+    log.info("Deleted expense {}", id);
+  }
+
+  private UserEntity findUser(String email) {
     return userRepository
         .findByEmail(email)
         .orElseThrow(() -> UserNotFoundException.byEmail(email));
   }
 
-  @Override
-  @Transactional(readOnly = true)
-  public ExpenseResponse findById(String email, Long id) {
-    log.info("Fetching expense by id: {}", id);
-    UserEntity user = getUser(email);
-    ExpenseEntity expense =
-        expenseRepository
-            .findByIdAndUser_Id(id, user.getId())
-            .orElseThrow(
-                () -> {
-                  log.error("Expense not found with this id: {}", id);
-                  return new ExpenseNotFoundException(id);
-                });
-    log.info("Successfully fetched expense with id: {}", id);
-    return expenseMapper.toResponse(expense);
+  private ExpenseEntity findOwnExpense(UserEntity owner, Long id) {
+    return expenseRepository
+        .findByIdAndUser_Id(id, owner.getId())
+        .orElseThrow(() -> new ExpenseNotFoundException(id));
   }
 
-  @Override
-  @Transactional
-  public void delete(String email, Long id) {
-    log.info("Delete expense by id: {}", id);
-    UserEntity user = getUser(email);
-    ExpenseEntity expense =
-        expenseRepository
-            .findByIdAndUser_Id(id, user.getId())
-            .orElseThrow(
-                () -> {
-                  log.error("Expense already deleted by id: {}", id);
-                  return new ExpenseNotFoundException(id);
-                });
-    expenseRepository.delete(expense);
-    log.info("Successfully deleted expense by id: {}", id);
-  }
-
-  @Override
-  @Transactional
-  public ExpenseResponse create(String email, ExpenseCreateRequest request) {
-    log.info("Creating expense with description: {}", request.description());
-    UserEntity user = getUser(email);
-    CategoryEntity category =
-        categoryRepository
-            .findById(request.categoryId())
-            .orElseThrow(() -> new CategoryNotFoundException(request.categoryId()));
-    ExpenseEntity expense = expenseMapper.toEntity(request);
-    expense.setCategory(category);
-    expense.setUser(user);
-    ExpenseEntity saved = expenseRepository.save(expense);
-    log.info("Successfully created expense with id: {}", saved.getId());
-    return expenseMapper.toResponse(saved);
-  }
-
-  @Override
-  @Transactional
-  public ExpenseResponse update(String email, Long id, ExpenseUpdateRequest request) {
-    log.info("Updating expense with id: {}", id);
-    UserEntity user = getUser(email);
-    ExpenseEntity expense =
-        expenseRepository
-            .findByIdAndUser_Id(id, user.getId())
-            .orElseThrow(() -> new ExpenseNotFoundException(id));
-    if (request.categoryId() != null) {
-      CategoryEntity category =
-          categoryRepository
-              .findById(request.categoryId())
-              .orElseThrow(() -> new CategoryNotFoundException(request.categoryId()));
-      expense.setCategory(category);
-    }
-    expenseMapper.updateEntity(request, expense);
-    ExpenseEntity updated = expenseRepository.save(expense);
-    log.info("Successfully updated expense with id: {}", id);
-    return expenseMapper.toResponse(updated);
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public List<ExpenseResponse> findAll(String email) {
-    log.info("Fetching all expenses");
-    UserEntity user = getUser(email);
-    List<ExpenseResponse> expenses =
-        expenseRepository.findAllByUser_Id(user.getId()).stream()
-            .map(expenseMapper::toResponse)
-            .toList();
-    log.info("Successfully fetched all expenses");
-    return expenses;
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public List<ExpenseResponse> findAllByStatus(String email, StatusType statusType) {
-    log.info("Fetching all expenses by status: {}", statusType);
-    UserEntity user = getUser(email);
-    List<ExpenseResponse> expenses =
-        expenseRepository.findAllByUser_IdAndStatusType(user.getId(), statusType).stream()
-            .map(expenseMapper::toResponse)
-            .toList();
-    log.info("Successfully fetched all expenses by status: {}", statusType);
-    return expenses;
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public List<ExpenseResponse> findAllByCategory(String email, Long categoryId) {
-    log.info("Fetching all expenses by category: {}", categoryId);
-    UserEntity user = getUser(email);
-    categoryRepository
+  private CategoryEntity findCategory(Long categoryId) {
+    return categoryRepository
         .findById(categoryId)
         .orElseThrow(() -> new CategoryNotFoundException(categoryId));
-    return expenseRepository.findAllByUser_IdAndCategory_Id(user.getId(), categoryId).stream()
-        .map(expenseMapper::toResponse)
-        .toList();
+  }
+
+  private List<ExpenseResponse> toResponses(List<ExpenseEntity> expenses) {
+    return expenses.stream().map(expenseMapper::toResponse).toList();
   }
 }

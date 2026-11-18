@@ -9,19 +9,23 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * A category from the shared catalog. Every user can read categories; only administrators can
+ * create, change or delete them.
+ */
 @Entity
 @Table(name = "categories")
 @Getter
 @Setter
 public class CategoryEntity extends BaseEntity {
 
-  @Column(nullable = false)
+  @Column(nullable = false, unique = true, length = 50)
   private String name;
 
-  @Column(nullable = false)
+  @Column(nullable = false, length = 50)
   private String icon;
 
-  @Column(nullable = false)
+  @Column(nullable = false, length = 30)
   private String color;
 
   @Enumerated(EnumType.STRING)

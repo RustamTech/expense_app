@@ -1,97 +1,70 @@
 package com.example.notes.application.coolproject.controller;
 
+import static com.example.notes.application.coolproject.TestData.USER_EMAIL;
+import static com.example.notes.application.coolproject.TestData.USER_ID;
+import static com.example.notes.application.coolproject.TestData.userResponse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.notes.application.coolproject.config.SecurityConfig;
-import com.example.notes.application.coolproject.dto.user.UserResponse;
 import com.example.notes.application.coolproject.dto.user.UserUpdateRequest;
 import com.example.notes.application.coolproject.enums.UserRole;
-import com.example.notes.application.coolproject.security.JwtService;
-import com.example.notes.application.coolproject.security.UserDetailsServiceImpl;
 import com.example.notes.application.coolproject.service.user.UserService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @WebMvcTest(UserController.class)
-@Import(SecurityConfig.class)
-class UserControllerTest {
+class UserControllerTest extends AbstractControllerTest {
 
-  @Autowired private MockMvc mockMvc;
+  private static final String ME = "/api/notes/users/me";
 
-  @Autowired private ObjectMapper objectMapper;
-
-  @MockBean private UserService userService;
-
-  @MockBean private JwtService jwtService;
-
-  @MockBean private UserDetailsServiceImpl userDetailsService;
+  @MockitoBean private UserService userService;
 
   @Test
-  @WithMockUser(username = "john@test.com")
-  void getMe_authenticated_returns200() throws Exception {
-    UserResponse response = buildUserResponse();
-    when(userService.getCurrentUser("john@test.com")).thenReturn(response);
+  @WithMockUser(username = USER_EMAIL)
+  void returnsOwnProfileWithoutPassword() throws Exception {
+    when(userService.getCurrentUser(USER_EMAIL))
+        .thenReturn(userResponse(USER_ID, USER_EMAIL, UserRole.USER));
 
     mockMvc
-        .perform(get("/api/notes/users/me"))
+        .perform(get(ME))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.email").value("john@test.com"))
-        .andExpect(jsonPath("$.firstName").value("John"));
+        .andExpect(jsonPath("$.email").value(USER_EMAIL))
+        .andExpect(jsonPath("$.userRole").value("USER"))
+        .andExpect(jsonPath("$.password").doesNotExist());
   }
 
   @Test
-  @WithMockUser(username = "john@test.com")
-  void updateMe_validRequest_returns200() throws Exception {
-    UserUpdateRequest request = new UserUpdateRequest("Jane", "Smith", "+9999999");
-    UserResponse response =
-        new UserResponse(
-            1L, "Jane", "Smith", "john@test.com", "+9999999", UserRole.USER, LocalDateTime.now());
+  @WithMockUser(username = USER_EMAIL)
+  void updatesOwnProfile() throws Exception {
+    var request = new UserUpdateRequest("Jane", "Doe", "+994501234567");
+    when(userService.updateCurrentUser(eq(USER_EMAIL), any()))
+        .thenReturn(userResponse(USER_ID, USER_EMAIL, UserRole.USER));
 
-    when(userService.updateCurrentUser(eq("john@test.com"), any())).thenReturn(response);
+    mockMvc.perform(put(ME).contentType(JSON).content(json(request))).andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser(username = USER_EMAIL)
+  void invalidPhoneReturns400() throws Exception {
+    var request = new UserUpdateRequest("Jane", "Doe", "call me");
 
     mockMvc
-        .perform(
-            put("/api/notes/users/me")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.firstName").value("Jane"));
+        .perform(put(ME).contentType(JSON).content(json(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[0].field").value("phoneNumber"));
+    verifyNoInteractions(userService);
   }
 
   @Test
-  @WithMockUser(username = "john@test.com")
-  void updateMe_blankFirstName_returns400() throws Exception {
-    UserUpdateRequest request = new UserUpdateRequest("", "Smith", "+9999999");
-
-    mockMvc
-        .perform(
-            put("/api/notes/users/me")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  void getMe_unauthenticated_returns401() throws Exception {
-    mockMvc.perform(get("/api/notes/users/me")).andExpect(status().isUnauthorized());
-  }
-
-  private UserResponse buildUserResponse() {
-    return new UserResponse(
-        1L, "John", "Doe", "john@test.com", "+1234567890", UserRole.USER, LocalDateTime.now());
+  void anonymousReturns401() throws Exception {
+    mockMvc.perform(get(ME)).andExpect(status().isUnauthorized());
   }
 }

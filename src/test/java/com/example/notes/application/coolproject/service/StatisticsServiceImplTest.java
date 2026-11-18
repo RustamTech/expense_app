@@ -1,20 +1,21 @@
 package com.example.notes.application.coolproject.service;
 
+import static com.example.notes.application.coolproject.TestData.USER_EMAIL;
+import static com.example.notes.application.coolproject.TestData.USER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
-import com.example.notes.application.coolproject.dto.statistics.StatisticsSummaryResponse;
+import com.example.notes.application.coolproject.TestData;
 import com.example.notes.application.coolproject.entity.CategoryEntity;
 import com.example.notes.application.coolproject.entity.ExpenseEntity;
-import com.example.notes.application.coolproject.entity.UserEntity;
-import com.example.notes.application.coolproject.enums.CategoryType;
 import com.example.notes.application.coolproject.enums.CurrencyType;
 import com.example.notes.application.coolproject.enums.StatusType;
+import com.example.notes.application.coolproject.exception.custom.UserNotFoundException;
 import com.example.notes.application.coolproject.repository.ExpenseRepository;
 import com.example.notes.application.coolproject.repository.UserRepository;
 import com.example.notes.application.coolproject.service.statistics.StatisticsServiceImpl;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -22,90 +23,77 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class StatisticsServiceImplTest {
 
-  private static final String EMAIL = "user@example.com";
-  private static final Long USER_ID = 1L;
-
   @Mock private ExpenseRepository expenseRepository;
-
   @Mock private UserRepository userRepository;
 
   @InjectMocks private StatisticsServiceImpl statisticsService;
 
-  private void mockUser() {
-    UserEntity user = new UserEntity();
-    ReflectionTestUtils.setField(user, "id", USER_ID);
-    user.setEmail(EMAIL);
-    when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+  private final CategoryEntity food = TestData.category(1L, "Food");
+  private final CategoryEntity taxi = TestData.category(2L, "Taxi");
+
+  private void ownerHas(List<ExpenseEntity> expenses) {
+    when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.of(TestData.regularUser()));
+    when(expenseRepository.findAllByUser_IdOrderByDateDesc(USER_ID)).thenReturn(expenses);
   }
 
   @Test
-  void getSummary_emptyExpenses_returnsZeroTotals() {
-    mockUser();
-    when(expenseRepository.findAllByUser_Id(USER_ID)).thenReturn(List.of());
+  void emptyHistoryGivesZeroCountAndEmptyMaps() {
+    ownerHas(List.of());
 
-    StatisticsSummaryResponse result = statisticsService.getSummary(EMAIL);
+    var summary = statisticsService.getSummary(USER_EMAIL);
 
-    assertThat(result.totalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
-    assertThat(result.totalCount()).isZero();
-    assertThat(result.amountByCategory()).isEmpty();
-    assertThat(result.countByStatus()).isEmpty();
-    assertThat(result.amountByCurrency()).isEmpty();
+    assertThat(summary.totalCount()).isZero();
+    assertThat(summary.totalByCurrency()).isEmpty();
+    assertThat(summary.amountByCategory()).isEmpty();
+    assertThat(summary.countByStatus()).isEmpty();
   }
 
   @Test
-  void getSummary_withExpenses_aggregatesCorrectly() {
-    CategoryEntity food = buildCategory("Food");
-    CategoryEntity transport = buildCategory("Transport");
+  void neverSumsAcrossCurrencies() {
+    ownerHas(
+        List.of(
+            TestData.expense(1L, "10.00", CurrencyType.AZN, StatusType.PAID, food),
+            TestData.expense(2L, "5.50", CurrencyType.AZN, StatusType.PENDING, taxi),
+            TestData.expense(3L, "100.00", CurrencyType.USD, StatusType.PAID, food)));
 
-    ExpenseEntity e1 =
-        buildExpense(BigDecimal.valueOf(100), StatusType.PAID, CurrencyType.USD, food);
-    ExpenseEntity e2 =
-        buildExpense(BigDecimal.valueOf(50), StatusType.PENDING, CurrencyType.USD, food);
-    ExpenseEntity e3 =
-        buildExpense(BigDecimal.valueOf(30), StatusType.PAID, CurrencyType.EUR, transport);
+    var summary = statisticsService.getSummary(USER_EMAIL);
 
-    mockUser();
-    when(expenseRepository.findAllByUser_Id(USER_ID)).thenReturn(List.of(e1, e2, e3));
-
-    StatisticsSummaryResponse result = statisticsService.getSummary(EMAIL);
-
-    assertThat(result.totalCount()).isEqualTo(3);
-    assertThat(result.totalAmount()).isEqualByComparingTo(BigDecimal.valueOf(180));
-    assertThat(result.amountByCategory()).containsKey("Food");
-    assertThat(result.amountByCategory().get("Food")).isEqualByComparingTo(BigDecimal.valueOf(150));
-    assertThat(result.amountByCategory().get("Transport"))
-        .isEqualByComparingTo(BigDecimal.valueOf(30));
-    assertThat(result.countByStatus().get(StatusType.PAID)).isEqualTo(2L);
-    assertThat(result.countByStatus().get(StatusType.PENDING)).isEqualTo(1L);
-    assertThat(result.amountByCurrency().get(CurrencyType.USD))
-        .isEqualByComparingTo(BigDecimal.valueOf(150));
-    assertThat(result.amountByCurrency().get(CurrencyType.EUR))
-        .isEqualByComparingTo(BigDecimal.valueOf(30));
+    assertThat(summary.totalCount()).isEqualTo(3);
+    assertThat(summary.totalByCurrency())
+        .containsEntry(CurrencyType.AZN, new BigDecimal("15.50"))
+        .containsEntry(CurrencyType.USD, new BigDecimal("100.00"))
+        .hasSize(2);
+    assertThat(summary.amountByCategory().get(CurrencyType.AZN))
+        .containsEntry("Food", new BigDecimal("10.00"))
+        .containsEntry("Taxi", new BigDecimal("5.50"));
+    assertThat(summary.amountByCategory().get(CurrencyType.USD))
+        .containsOnlyKeys("Food")
+        .containsEntry("Food", new BigDecimal("100.00"));
+    assertThat(summary.countByStatus())
+        .containsEntry(StatusType.PAID, 2L)
+        .containsEntry(StatusType.PENDING, 1L);
   }
 
-  private CategoryEntity buildCategory(String name) {
-    CategoryEntity c = new CategoryEntity();
-    c.setName(name);
-    c.setIcon("icon");
-    c.setColor("red");
-    c.setCategoryType(CategoryType.EXPENSE);
-    return c;
+  @Test
+  void expensesWithoutCurrencyOrStatusAreCountedButNotSummed() {
+    ownerHas(List.of(TestData.expense(1L, "7.00", null, null, food)));
+
+    var summary = statisticsService.getSummary(USER_EMAIL);
+
+    assertThat(summary.totalCount()).isEqualTo(1);
+    assertThat(summary.totalByCurrency()).isEmpty();
+    assertThat(summary.countByStatus()).isEmpty();
   }
 
-  private ExpenseEntity buildExpense(
-      BigDecimal amount, StatusType status, CurrencyType currency, CategoryEntity category) {
-    ExpenseEntity e = new ExpenseEntity();
-    e.setAmount(amount);
-    e.setDescription("test");
-    e.setDate(LocalDate.now());
-    e.setStatusType(status);
-    e.setCurrencyType(currency);
-    e.setCategory(category);
-    return e;
+  @Test
+  void unknownCallerThrowsUserNotFound() {
+    when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> statisticsService.getSummary(USER_EMAIL))
+        .isInstanceOf(UserNotFoundException.class);
   }
 }

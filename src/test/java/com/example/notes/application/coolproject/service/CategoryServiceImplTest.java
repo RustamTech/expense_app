@@ -7,15 +7,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.notes.application.coolproject.TestData;
 import com.example.notes.application.coolproject.dto.category.CategoryCreateRequest;
 import com.example.notes.application.coolproject.dto.category.CategoryResponse;
 import com.example.notes.application.coolproject.dto.category.CategoryUpdateRequest;
 import com.example.notes.application.coolproject.entity.CategoryEntity;
 import com.example.notes.application.coolproject.enums.CategoryType;
+import com.example.notes.application.coolproject.exception.custom.CategoryInUseException;
 import com.example.notes.application.coolproject.exception.custom.CategoryNotFoundException;
 import com.example.notes.application.coolproject.exception.custom.ResourceAlreadyExistsException;
 import com.example.notes.application.coolproject.mapper.CategoryMapper;
 import com.example.notes.application.coolproject.repository.CategoryRepository;
+import com.example.notes.application.coolproject.repository.ExpenseRepository;
 import com.example.notes.application.coolproject.service.category.CategoryServiceImpl;
 import java.util.List;
 import java.util.Optional;
@@ -29,134 +32,128 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CategoryServiceImplTest {
 
   @Mock private CategoryRepository categoryRepository;
-
+  @Mock private ExpenseRepository expenseRepository;
   @Mock private CategoryMapper categoryMapper;
 
   @InjectMocks private CategoryServiceImpl categoryService;
 
+  private final CategoryEntity food = TestData.category(1L, "Food");
+  private final CategoryResponse foodResponse = TestData.categoryResponse(1L, "Food");
+
   @Test
-  void findById_existingId_returnsResponse() {
-    CategoryEntity entity = buildEntity(1L, "Food");
-    CategoryResponse response = buildResponse(1L, "Food");
+  void returnsCategoryById() {
+    when(categoryRepository.findById(1L)).thenReturn(Optional.of(food));
+    when(categoryMapper.toResponse(food)).thenReturn(foodResponse);
 
-    when(categoryRepository.findById(1L)).thenReturn(Optional.of(entity));
-    when(categoryMapper.toResponse(entity)).thenReturn(response);
-
-    CategoryResponse result = categoryService.findById(1L);
-
-    assertThat(result).isEqualTo(response);
-    verify(categoryRepository).findById(1L);
+    assertThat(categoryService.findById(1L)).isEqualTo(foodResponse);
   }
 
   @Test
-  void findById_notFound_throwsCategoryNotFoundException() {
-    when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
+  void missingCategoryThrowsNotFound() {
+    when(categoryRepository.findById(9L)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> categoryService.findById(99L))
+    assertThatThrownBy(() -> categoryService.findById(9L))
         .isInstanceOf(CategoryNotFoundException.class);
   }
 
   @Test
-  void create_newName_returnsSavedResponse() {
-    CategoryCreateRequest request =
-        new CategoryCreateRequest("🍔", "red", "Food", CategoryType.EXPENSE);
-    CategoryEntity entity = buildEntity(1L, "Food");
-    CategoryResponse response = buildResponse(1L, "Food");
+  void listsCatalogSortedByName() {
+    when(categoryRepository.findAllByOrderByNameAsc()).thenReturn(List.of(food));
+    when(categoryMapper.toResponse(food)).thenReturn(foodResponse);
 
-    when(categoryRepository.findByName("Food")).thenReturn(Optional.empty());
-    when(categoryMapper.toEntity(request)).thenReturn(entity);
-    when(categoryRepository.save(entity)).thenReturn(entity);
-    when(categoryMapper.toResponse(entity)).thenReturn(response);
-
-    CategoryResponse result = categoryService.create(request);
-
-    assertThat(result).isEqualTo(response);
-    verify(categoryRepository).save(entity);
+    assertThat(categoryService.findAll()).containsExactly(foodResponse);
   }
 
   @Test
-  void create_duplicateName_throwsResourceAlreadyExistsException() {
-    CategoryCreateRequest request =
-        new CategoryCreateRequest("🍔", "red", "Food", CategoryType.EXPENSE);
+  void createsCategoryWithTrimmedName() {
+    var request = new CategoryCreateRequest("🍔", "#FF0000", "  Food ", CategoryType.EXPENSE);
+    CategoryEntity mapped = new CategoryEntity();
+    when(categoryRepository.existsByNameIgnoreCase("Food")).thenReturn(false);
+    when(categoryMapper.toEntity(request)).thenReturn(mapped);
+    when(categoryRepository.save(mapped)).thenReturn(food);
+    when(categoryMapper.toResponse(food)).thenReturn(foodResponse);
 
-    when(categoryRepository.findByName("Food")).thenReturn(Optional.of(buildEntity(1L, "Food")));
+    assertThat(categoryService.create(request)).isEqualTo(foodResponse);
+    assertThat(mapped.getName()).isEqualTo("Food");
+  }
+
+  @Test
+  void createWithTakenNameThrowsConflict() {
+    var request = new CategoryCreateRequest("🍔", "#FF0000", "food", CategoryType.EXPENSE);
+    when(categoryRepository.existsByNameIgnoreCase("food")).thenReturn(true);
 
     assertThatThrownBy(() -> categoryService.create(request))
         .isInstanceOf(ResourceAlreadyExistsException.class);
-
     verify(categoryRepository, never()).save(any());
   }
 
   @Test
-  void update_existingId_returnsUpdatedResponse() {
-    CategoryUpdateRequest request =
-        new CategoryUpdateRequest("🍕", "blue", "Pizza", CategoryType.EXPENSE);
-    CategoryEntity entity = buildEntity(1L, "Food");
-    CategoryResponse response = buildResponse(1L, "Pizza");
+  void updatesCategory() {
+    var request = new CategoryUpdateRequest(null, "#00FF00", "Meals", null);
+    when(categoryRepository.findById(1L)).thenReturn(Optional.of(food));
+    when(categoryRepository.existsByNameIgnoreCaseAndIdNot("Meals", 1L)).thenReturn(false);
 
-    when(categoryRepository.findById(1L)).thenReturn(Optional.of(entity));
-    when(categoryRepository.save(entity)).thenReturn(entity);
-    when(categoryMapper.toResponse(entity)).thenReturn(response);
+    categoryService.update(1L, request);
 
-    CategoryResponse result = categoryService.update(1L, request);
-
-    assertThat(result).isEqualTo(response);
-    verify(categoryMapper).updateCategory(request, entity);
+    verify(categoryMapper).updateCategory(request, food);
+    assertThat(food.getName()).isEqualTo("Meals");
   }
 
   @Test
-  void update_notFound_throwsCategoryNotFoundException() {
-    CategoryUpdateRequest request =
-        new CategoryUpdateRequest("🍕", "blue", "Pizza", CategoryType.EXPENSE);
-    when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
+  void renameToNameOfAnotherCategoryThrowsConflict() {
+    var request = new CategoryUpdateRequest(null, null, "Taxi", null);
+    when(categoryRepository.findById(1L)).thenReturn(Optional.of(food));
+    when(categoryRepository.existsByNameIgnoreCaseAndIdNot("Taxi", 1L)).thenReturn(true);
 
-    assertThatThrownBy(() -> categoryService.update(99L, request))
+    assertThatThrownBy(() -> categoryService.update(1L, request))
+        .isInstanceOf(ResourceAlreadyExistsException.class);
+    verify(categoryMapper, never()).updateCategory(any(), any());
+  }
+
+  @Test
+  void updateWithoutNameSkipsUniquenessCheck() {
+    var request = new CategoryUpdateRequest("🍕", null, null, null);
+    when(categoryRepository.findById(1L)).thenReturn(Optional.of(food));
+
+    categoryService.update(1L, request);
+
+    verify(categoryRepository, never()).existsByNameIgnoreCaseAndIdNot(any(), any());
+    assertThat(food.getName()).isEqualTo("Food");
+  }
+
+  @Test
+  void updateOfMissingCategoryThrowsNotFound() {
+    when(categoryRepository.findById(9L)).thenReturn(Optional.empty());
+    var request = new CategoryUpdateRequest(null, null, "X", null);
+
+    assertThatThrownBy(() -> categoryService.update(9L, request))
         .isInstanceOf(CategoryNotFoundException.class);
   }
 
   @Test
-  void delete_existingId_deletesSuccessfully() {
-    CategoryEntity entity = buildEntity(1L, "Food");
-    when(categoryRepository.findById(1L)).thenReturn(Optional.of(entity));
+  void deletesUnusedCategory() {
+    when(categoryRepository.findById(1L)).thenReturn(Optional.of(food));
+    when(expenseRepository.existsByCategory_Id(1L)).thenReturn(false);
 
     categoryService.delete(1L);
 
-    verify(categoryRepository).delete(entity);
+    verify(categoryRepository).delete(food);
   }
 
   @Test
-  void delete_notFound_throwsCategoryNotFoundException() {
-    when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
+  void deletingCategoryInUseThrowsConflict() {
+    when(categoryRepository.findById(1L)).thenReturn(Optional.of(food));
+    when(expenseRepository.existsByCategory_Id(1L)).thenReturn(true);
 
-    assertThatThrownBy(() -> categoryService.delete(99L))
-        .isInstanceOf(CategoryNotFoundException.class);
-
+    assertThatThrownBy(() -> categoryService.delete(1L)).isInstanceOf(CategoryInUseException.class);
     verify(categoryRepository, never()).delete(any());
   }
 
   @Test
-  void findAll_returnsMappedList() {
-    CategoryEntity entity = buildEntity(1L, "Food");
-    CategoryResponse response = buildResponse(1L, "Food");
+  void deletingMissingCategoryThrowsNotFound() {
+    when(categoryRepository.findById(9L)).thenReturn(Optional.empty());
 
-    when(categoryRepository.findAll()).thenReturn(List.of(entity));
-    when(categoryMapper.toResponse(entity)).thenReturn(response);
-
-    List<CategoryResponse> result = categoryService.findAll();
-
-    assertThat(result).hasSize(1).containsExactly(response);
-  }
-
-  private CategoryEntity buildEntity(Long id, String name) {
-    CategoryEntity e = new CategoryEntity();
-    e.setName(name);
-    e.setIcon("🍔");
-    e.setColor("red");
-    e.setCategoryType(CategoryType.EXPENSE);
-    return e;
-  }
-
-  private CategoryResponse buildResponse(Long id, String name) {
-    return new CategoryResponse(id, "red", "🍔", name);
+    assertThatThrownBy(() -> categoryService.delete(9L))
+        .isInstanceOf(CategoryNotFoundException.class);
   }
 }

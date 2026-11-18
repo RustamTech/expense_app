@@ -14,22 +14,29 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+/**
+ * An account. Doubles as the Spring Security principal: the username is the (normalized) email and
+ * the single authority is {@code ROLE_<userRole>}. A disabled account can neither log in nor use
+ * previously issued tokens.
+ */
 @Entity
 @Table(name = "users")
 @Getter
 @Setter
 public class UserEntity extends BaseEntity implements UserDetails {
 
-  @Column(nullable = false)
+  private static final String ROLE_PREFIX = "ROLE_";
+
+  @Column(nullable = false, length = 50)
   private String firstName;
 
-  @Column(nullable = false)
+  @Column(nullable = false, length = 50)
   private String lastName;
 
-  @Column(unique = true, nullable = false)
+  @Column(unique = true, nullable = false, length = 254)
   private String email;
 
-  @Column(nullable = false)
+  @Column(nullable = false, length = 20)
   private String phoneNumber;
 
   @Column(nullable = false)
@@ -40,33 +47,16 @@ public class UserEntity extends BaseEntity implements UserDetails {
   private UserRole userRole;
 
   @Column(nullable = false)
-  private boolean enabled = false;
-
-  // UserDetails методы:
+  private boolean enabled;
 
   @Override
   public Collection<? extends GrantedAuthority> getAuthorities() {
-    return List.of(new SimpleGrantedAuthority("ROLE_" + userRole.name()));
+    return List.of(new SimpleGrantedAuthority(ROLE_PREFIX + userRole.name()));
   }
 
   @Override
   public String getUsername() {
     return email;
-  }
-
-  @Override
-  public boolean isAccountNonExpired() {
-    return true;
-  }
-
-  @Override
-  public boolean isAccountNonLocked() {
-    return true;
-  }
-
-  @Override
-  public boolean isCredentialsNonExpired() {
-    return true;
   }
 
   @Override

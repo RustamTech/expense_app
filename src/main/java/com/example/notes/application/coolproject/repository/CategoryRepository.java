@@ -1,20 +1,33 @@
 package com.example.notes.application.coolproject.repository;
 
 import com.example.notes.application.coolproject.entity.CategoryEntity;
-import com.example.notes.application.coolproject.enums.CategoryType;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
-@Repository
+/** Data access for the shared category catalog. */
 public interface CategoryRepository extends JpaRepository<CategoryEntity, Long> {
 
-  List<CategoryEntity> findAllByCategoryType(CategoryType categoryType);
+  /**
+   * Checks whether a category with this name exists, ignoring case.
+   *
+   * @param name category name
+   * @return {@code true} if the name is taken
+   */
+  boolean existsByNameIgnoreCase(String name);
 
-  Optional<CategoryEntity> findByName(String name);
+  /**
+   * Checks whether another category already uses this name, ignoring case.
+   *
+   * @param name category name
+   * @param id identifier of the category being renamed
+   * @return {@code true} if a different category has this name
+   */
+  boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 
-  List<CategoryEntity> findAllByDefaultCategory(boolean defaultCategory);
-
-  boolean existsByName(String name);
+  /**
+   * Returns the whole catalog sorted by name.
+   *
+   * @return all categories
+   */
+  List<CategoryEntity> findAllByOrderByNameAsc();
 }
