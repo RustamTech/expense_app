@@ -1,8 +1,9 @@
 # Coolproject — Expense Tracker API
 
-A RESTful expense tracking backend built with Spring Boot 3 and Java 21. Users register, log in with
-JWT, and manage their own expenses and categories — every resource is scoped to its owner, with
-aggregated statistics available on demand.
+A REST backend for tracking personal expenses, built with Spring Boot 3.4 and Java 21. Users register,
+log in with a JWT and manage their own expenses; every expense and statistic is scoped to its owner.
+Administrators manage the shared category catalog and user accounts. All errors follow RFC 9457
+(`application/problem+json`).
 
 ---
 
@@ -10,17 +11,218 @@ aggregated statistics available on demand.
 
 | Layer | Technology |
 |---|---|
-| Language | Java 21 |
+| Language | Java 21 (Gradle toolchain) |
 | Framework | Spring Boot 3.4.5 |
-| Security | Spring Security + JWT (jjwt 0.12.5) |
+| Security | Spring Security, stateless JWT (jjwt 0.12), BCrypt |
 | Database | PostgreSQL 16 |
-| ORM | Spring Data JPA / Hibernate |
-| Mapping | MapStruct 1.5.5 |
+| Persistence | Spring Data JPA / Hibernate |
+| Mapping | MapStruct |
 | Validation | Jakarta Bean Validation |
-| API Docs | SpringDoc OpenAPI (Swagger UI, with Bearer-token auth) |
-| Testing | JUnit 5, Mockito, Spring MockMvc |
-| Build | Gradle 9.4 |
+| API docs | SpringDoc OpenAPI (Swagger UI with Bearer auth) |
+| Testing | JUnit 5, Mockito, AssertJ, MockMvc, spring-security-test |
+| Quality | Spotless (google-java-format), JaCoCo coverage gate (80% lines) |
+| Build | Gradle 9 (wrapper) |
 | Boilerplate | Lombok |
+
+---
+
+## Getting Started
+
+**Prerequisites:** JDK 21, Docker.
+
+```bash
+# 1. Start PostgreSQL
+docker compose up -d postgres
+
+# 2. Run the app (uses the `dev` profile automatically)
+./gradlew bootRun
+```
+
+Open Swagger UI at http://localhost:8080/swagger-ui, click **Authorize** and paste the token from
+`/auth/login` (without the `Bearer ` prefix).
+
+The `dev` profile (`application-dev.yaml`) is meant for a developer machine only. It provides:
+
+- the docker-compose DB password (`postgres`),
+- a development JWT secret,
+- a bootstrap administrator `admin@local.dev` / `admin12345`.
+
+On Windows PowerShell, use `.\gradlew.bat` instead of `./gradlew`.
+
+### Configuration
+
+Outside the `dev` profile, the app reads its secrets from environment variables. Nothing secret has
+a default in `application.yaml`.
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `JWT_SECRET` | **yes** | — | Base64 HMAC key, at least 256 bits. The app refuses to start without it or with a shorter key. |
+| `DB_PASSWORD` | **yes** | — | PostgreSQL password |
+| `DB_URL` | no | `jdbc:postgresql://localhost:5432/expensedb` | JDBC URL |
+| `DB_USERNAME` | no | `postgres` | DB user |
+| `JWT_EXPIRATION` | no | `86400000` (24 h) | Token lifetime, in milliseconds |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | no | empty | Bootstrap administrator, created once on startup if both are set |
+| `JPA_DDL_AUTO` | no | `update` | Hibernate schema mode |
+| `SPRING_PROFILES_ACTIVE` | no | `dev` for `bootRun` | Active Spring profile |
+
+---
+
+## Development Commands
+
+| Task | Command |
+|---|---|
+| Format code | `./gradlew spotlessApply` |
+| Full check (format + all tests + 80% coverage) | `./gradlew check` |
+| Unit tests only, no DB needed | `./gradlew test -PunitOnly` |
+| Run one test class | `./gradlew test --tests '*ExpenseServiceImplTest'` |
+| Coverage report | `build/reports/jacoco/test/html/index.html` |
+
+`./gradlew check` runs `CoolprojectApplicationTests`, which needs the local PostgreSQL to be running.
+The coverage gate leaves out DTO, entity, enum, config and mapper packages. The compiler runs with
+`-Xlint:unchecked,deprecation`.
+
+---
+
+## API
+
+Base path: `/api/notes`. Every endpoint except `/auth/**` needs `Authorization: Bearer <token>`.
+
+### Authentication — public
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/auth/register` | Register a new user (always role `USER`). Returns a JWT. |
+| POST | `/auth/login` | Log in. Returns a JWT plus email, name and role. |
+
+Emails are trimmed and lower-cased before they are stored or compared.
+
+### Profile — any authenticated user
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/users/me` | Current user's profile |
+| PUT | `/users/me` | Update first name, last name and phone |
+
+### Expenses — owner only
+
+Every query is filtered by the authenticated user. Another user's expense answers **404**, never
+403, so the API doesn't reveal that it exists. Lists are sorted newest first.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/expenses` | List own expenses |
+| GET | `/expenses/{id}` | Get one own expense |
+| GET | `/expenses/status/{status}` | Filter by status: `PENDING`, `PLANNED`, `PAID` |
+| GET | `/expenses/category/{categoryId}` | Filter by category |
+| POST | `/expenses` | Create an expense |
+| PUT | `/expenses/{id}` | Update an own expense |
+| DELETE | `/expenses/{id}` | Delete an own expense |
+
+### Categories — read: any user · write: ADMIN
+
+Categories are a shared catalog. Names are unique, ignoring case.
+
+| Method | Path | Access | Description |
+|---|---|---|---|
+| GET | `/categories` | user | List categories |
+| GET | `/categories/{id}` | user | Get a category |
+| POST | `/categories` | ADMIN | Create (409 if the name is taken) |
+| PUT | `/categories/{id}` | ADMIN | Update or rename (409 if the name is taken) |
+| DELETE | `/categories/{id}` | ADMIN | Delete (409 `CATEGORY_IN_USE` if expenses reference it) |
+
+### Statistics — owner only
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/statistics/summary` | Summary of the current user's expenses |
+
+Amounts in different currencies are never added together. The response groups them by currency:
+
+```json
+{
+  "totalCount": 3,
+  "totalByCurrency": { "AZN": 62.50, "USD": 10.00 },
+  "amountByCategory": { "AZN": { "Food": 12.50, "Transport": 50.00 }, "USD": { "Food": 10.00 } },
+  "countByStatus": { "PAID": 2, "PENDING": 1 }
+}
+```
+
+### Admin: users — ADMIN only
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/users?page=0&size=20&sort=id` | Paged list of users |
+| GET | `/admin/users/{id}` | Get a user |
+| PATCH | `/admin/users/{id}/role` | Change role: `{"role": "ADMIN"}` |
+| PATCH | `/admin/users/{id}/status` | Block or unblock: `{"enabled": false}` |
+| DELETE | `/admin/users/{id}` | Delete a user and all their expenses |
+
+An administrator can't change the role of, block or delete their own account (409
+`OPERATION_NOT_ALLOWED`). A blocked or deleted user loses access right away, even with a token
+issued earlier.
+
+Paged responses look like `{ "content": [...], "page": 0, "size": 20, "totalElements": 42, "totalPages": 3 }`.
+
+---
+
+## Error Handling
+
+Every error, including 401 and 403 from the security filter chain, is returned as an RFC 9457
+`ProblemDetail` with two extra fields: a stable `code` and a `timestamp`. Validation errors also list
+each failing field.
+
+```json
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Request validation failed",
+  "instance": "/api/notes/expenses",
+  "code": "VALIDATION_FAILED",
+  "timestamp": "2026-11-20T10:15:30Z",
+  "errors": [{ "field": "amount", "message": "must be greater than 0" }]
+}
+```
+
+| Status | Codes |
+|---|---|
+| 400 | `VALIDATION_FAILED`, `MALFORMED_JSON`, `INVALID_PARAMETER`, `MISSING_PARAMETER` |
+| 401 | `AUTHENTICATION_REQUIRED`, `INVALID_TOKEN` (expired or tampered), `INVALID_CREDENTIALS` |
+| 403 | `ACCESS_DENIED` (wrong role) |
+| 404 | `EXPENSE_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `USER_NOT_FOUND`, `RESOURCE_NOT_FOUND` (unknown URL) |
+| 405 / 406 / 415 | `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE` |
+| 409 | `RESOURCE_ALREADY_EXISTS`, `CATEGORY_IN_USE`, `OPERATION_NOT_ALLOWED`, `DATA_CONFLICT` |
+| 500 | `INTERNAL_SERVER_ERROR` (details are logged, never returned) |
+
+Malformed JSON, unknown enum values (the error lists the allowed ones), wrong JSON types and invalid
+dates each get a specific message. Database constraint violations return 409 without SQL details.
+
+---
+
+## Validation Rules
+
+| Field | Rule |
+|---|---|
+| Email | valid format, at most 254 chars, unique |
+| Password | 8 to 72 chars (the BCrypt input limit) |
+| First / last name | not blank, at most 50 chars |
+| Phone | international format, for example `+994501234567` |
+| Expense amount | greater than 0, at most 2 decimal places |
+| Expense description / note | at most 255 / 1000 chars |
+| Category name / icon / color | not blank, at most 50 / 50 / 30 chars |
+
+---
+
+## Domain Model
+
+- **UserEntity**: `firstName`, `lastName`, `email` (unique), `phoneNumber`, `password` (BCrypt),
+  `userRole` (`USER` | `ADMIN`), `enabled`. Implements Spring Security `UserDetails`.
+- **CategoryEntity**: `name` (unique), `icon`, `color`, `categoryType` (`INCOME` | `EXPENSE`), `defaultCategory`.
+- **ExpenseEntity**: `amount` (numeric 19,2), `description`, `note`, `date`, `statusType`
+  (`PENDING` | `PLANNED` | `PAID`), `currencyType` (`AZN` | `USD` | `EUR`). It belongs to one user
+  and one category.
+
+All entities extend `BaseEntity` (`id`, `createdAt`, `updatedAt`).
 
 ---
 
@@ -28,184 +230,66 @@ aggregated statistics available on demand.
 
 ```
 src/main/java/com/example/notes/application/coolproject/
-├── config/
-│   ├── Endpoints.java          # Centralized API path constants
-│   ├── OpenApiConfig.java      # Swagger / OpenAPI + Bearer-auth scheme
-│   └── SecurityConfig.java     # Spring Security filter chain, JWT filter wiring
-├── controller/
-│   ├── AuthController.java         # POST /register, /login
-│   ├── UserController.java         # GET/PUT current user profile
-│   ├── CategoryController.java     # CRUD for categories
-│   ├── ExpenseController.java      # CRUD + filtering for expenses (owner-scoped)
-│   └── StatisticsController.java   # Aggregated spending summary (owner-scoped)
-├── dto/
-│   ├── auth/                   # RegisterRequest, LoginRequest, AuthResponse
-│   ├── userDto/                # UserResponse, UserUpdateRequest
-│   ├── categoryDto/            # CategoryCreateRequest, UpdateRequest, Response
-│   ├── expenseDto/             # ExpenseCreateRequest, UpdateRequest, Response
-│   └── statisticsDto/          # StatisticsSummaryResponse
-├── entity/
-│   ├── BaseEntity.java         # id, createdAt, updatedAt (MappedSuperclass)
-│   ├── UserEntity.java         # UserDetails implementation
-│   ├── CategoryEntity.java
-│   └── ExpenseEntity.java      # owned by a UserEntity, linked to a CategoryEntity
-├── enums/
-│   ├── CategoryType.java       # INCOME | EXPENSE
-│   ├── CurrencyType.java       # AZN | USD | EUR
-│   ├── StatusType.java         # PENDING | PLANNED | PAID
-│   └── UserRole.java           # USER | ADMIN
-├── exception/
-│   ├── BaseException.java
-│   ├── ErrorCode.java
-│   ├── ErrorResponse.java
-│   ├── GlobalExceptionHandler.java   # Centralized @RestControllerAdvice
-│   └── custom/                 # CategoryNotFoundException, ExpenseNotFoundException, UserNotFoundException, ...
-├── mapper/
-│   ├── CategoryMapper.java
-│   ├── ExpenseMapper.java
-│   └── UserMapper.java         # MapStruct mappers (generated at compile time)
-├── repository/
-│   ├── CategoryRepository.java
-│   ├── ExpenseRepository.java  # owner-scoped query methods
-│   └── UserRepository.java
-└── service/
-    ├── category/               # CategoryService + CategoryServiceImpl
-    ├── expense/                # ExpenseService + ExpenseServiceImpl
-    ├── user/                   # UserService + UserServiceImpl
-    ├── statistics/             # StatisticsService + StatisticsServiceImpl
-    └── security/                # AuthService, JwtService, JwtAuthFilter, UserDetailsServiceImpl
+├── config/        Endpoints (all API paths), SecurityConfig, OpenApiConfig, AdminProperties
+├── controller/    Auth, User, Expense, Category, Statistics, AdminUser (no business logic)
+├── dto/           Request/response records per domain, PageResponse, shared validators
+├── entity/        JPA entities
+├── enums/         CategoryType, CurrencyType, StatusType, UserRole
+├── exception/     BaseException, ErrorCode, GlobalExceptionHandler, custom/ exceptions
+├── mapper/        MapStruct mappers
+├── repository/    Spring Data repositories (owner-scoped queries)
+├── security/      JwtService, JwtAuthFilter, JwtProperties, UserDetailsServiceImpl, EmailNormalizer
+└── service/       admin/, auth/, category/, expense/, statistics/, user/ (interface + Impl)
 ```
 
----
-
-## API Endpoints
-
-Base path: `/api/notes`
-
-### Authentication
-
-| Method | Path | Description | Auth required |
-|---|---|---|---|
-| POST | `/auth/register` | Register a new user, returns JWT | No |
-| POST | `/auth/login` | Login, returns JWT | No |
-
-### Users
-
-| Method | Path | Description | Auth required |
-|---|---|---|---|
-| GET | `/users/me` | Get current user's profile | Yes |
-| PUT | `/users/me` | Update current user's profile | Yes |
-
-### Categories
-
-| Method | Path | Description | Auth required |
-|---|---|---|---|
-| GET | `/categories` | List all categories | Yes |
-| GET | `/categories/{id}` | Get category by ID | Yes |
-| POST | `/categories` | Create category | Yes |
-| PUT | `/categories/{id}` | Update category | Yes |
-| DELETE | `/categories/{id}` | Delete category | Yes |
-
-### Expenses
-
-All expense endpoints only ever return or mutate expenses owned by the authenticated user.
-
-| Method | Path | Description | Auth required |
-|---|---|---|---|
-| GET | `/expenses` | List the current user's expenses | Yes |
-| GET | `/expenses/{id}` | Get one of the current user's expenses by ID | Yes |
-| POST | `/expenses` | Create an expense owned by the current user | Yes |
-| PUT | `/expenses/{id}` | Update one of the current user's expenses | Yes |
-| DELETE | `/expenses/{id}` | Delete one of the current user's expenses | Yes |
-| GET | `/expenses/status/{status}` | Filter own expenses by status (`PENDING`, `PLANNED`, `PAID`) | Yes |
-| GET | `/expenses/category/{categoryId}` | Filter own expenses by category | Yes |
-
-### Statistics
-
-| Method | Path | Description | Auth required |
-|---|---|---|---|
-| GET | `/statistics/summary` | Aggregated spending summary for the current user (total, by category, by status, by currency) | Yes |
-
-Swagger UI: `http://localhost:8080/swagger-ui/index.html` — click **Authorize** and paste your JWT (no `Bearer ` prefix needed) to try protected endpoints directly from the docs.
-
----
-
-## Domain Model
-
-**UserEntity** — stores user credentials; implements Spring Security `UserDetails`. Fields: `firstName`, `lastName`, `email` (unique), `phoneNumber`, `password`, `userRole`, `enabled`.
-
-**CategoryEntity** — a shared expense category. Fields: `name`, `icon`, `color`, `categoryType` (`INCOME`/`EXPENSE`), `defaultCategory`.
-
-**ExpenseEntity** — a single expense record, owned by exactly one user. Fields: `amount`, `description`, `note`, `date`, `statusType`, `currencyType`, linked to one `CategoryEntity` and one `UserEntity`.
+Requests flow `controller → service → repository → entity`. Only DTOs leave the API, never
+entities. Each service method runs in its own transaction, and read methods use `readOnly = true`.
 
 ---
 
 ## Security
 
-- Stateless JWT authentication (HS256) — no server-side sessions.
-- Passwords hashed with BCrypt.
-- Every expense/statistics query is scoped to the authenticated user at the repository level, preventing one user from accessing another's data by guessing IDs.
-- Centralized exception handling returns consistent JSON error bodies (`{message, code, timeStamp, status}`) for validation errors, not-found resources, and authentication failures (bad login returns a clean `401`, not a `500`).
+- Stateless JWT (HMAC SHA-256). The key is decoded once and must be at least 256 bits. There is no
+  default secret.
+- Passwords are hashed with BCrypt. Tokens and passwords are never logged.
+- Two roles: `USER` (assigned at registration) and `ADMIN` (created at startup from
+  `ADMIN_EMAIL`/`ADMIN_PASSWORD`, or promoted by another admin).
+- Access rules: `/admin/**` and category writes need `ADMIN`; every other endpoint needs an
+  authenticated user. 401 means not authenticated, 403 means the wrong role.
+- Users can only reach their own data. Access is enforced in repository queries, so guessing IDs
+  doesn't expose other users' records.
+- HTTP Basic, form login and server-side sessions are disabled. The error page never shows messages
+  or stack traces.
 
 ---
 
-## Infrastructure (docker-compose.yaml)
+## Infrastructure (`docker-compose.yaml`)
 
-| Service | Image | Port |
-|---|---|---|
-| PostgreSQL | postgres:16 | 5432 |
-| Redis | redis:7 | 6379 |
-| Keycloak | keycloak:24.0 | 8180 |
-| MinIO | minio/minio | 9000 / 9001 |
-
-> Redis, Keycloak, and MinIO are included in the compose file but not yet wired into the application code — they are infrastructure placeholders for planned features.
+| Service | Image | Port | Status |
+|---|---|---|---|
+| PostgreSQL | postgres:16 | 5432 | used |
+| Redis | redis:7 | 6379 | placeholder |
+| Keycloak | keycloak:24.0 | 8180 | placeholder |
+| MinIO | minio/minio | 9000 / 9001 | placeholder |
 
 ---
 
-## Current State
+## Roadmap
 
-### Done
-- JWT-based authentication (register / login) with proper 401 handling on bad credentials
-- User profile endpoints (`/users/me`)
-- Full CRUD for Categories and Expenses
-- Per-user data isolation for expenses and statistics (no IDOR)
-- Filtering expenses by status and category
-- Aggregated spending statistics per user
-- Structured exception handling with `ErrorCode` enum
-- MapStruct mappers for all entities
-- Swagger UI with Bearer-token authorization
-- Unit and MockMvc controller tests
-- Docker Compose with PostgreSQL
+**Done**
 
-### Not yet implemented / TODO
-- Role-based access control (an `ADMIN` role exists but nothing enforces it yet)
-- Refresh tokens / logout invalidation (JWTs are stateless with a fixed 24h expiry)
-- Schema migrations via Flyway/Liquibase (currently relies on `ddl-auto: update`)
-- Redis integration (caching / sessions)
-- Keycloak integration (SSO / OAuth2)
-- MinIO integration (file/receipt uploads)
-- Email verification flow
+- JWT authentication and user profile
+- Owner-scoped expenses with filtering, plus per-currency statistics
+- Role-based access (`USER` / `ADMIN`), admin user management and a bootstrap admin
+- Admin-managed category catalog with unique names and in-use protection
+- Unified RFC 9457 error handling
+- Validation at the API boundary
+- Unit and MockMvc tests, Spotless and an 80% coverage gate
 
----
+**Planned**
 
-## Running Locally
-
-**1. Start the database**
-```bash
-docker-compose up -d postgres
-```
-
-**2. Set required environment variables** (or rely on the local defaults in `application.yaml`)
-```bash
-export JWT_SECRET=<your-base64-secret>
-export DB_URL=jdbc:postgresql://localhost:5432/expensedb
-export DB_USERNAME=postgres
-export DB_PASSWORD=postgres
-```
-
-**3. Build and run**
-```bash
-./gradlew bootRun
-```
-
-Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+- Refresh tokens and logout or token revocation
+- Schema migrations with Flyway or Liquibase (instead of `ddl-auto: update`)
+- Pagination and date-range filters for expenses
+- Redis caching, Keycloak SSO, receipt uploads to MinIO
+- Email verification
