@@ -5,6 +5,9 @@ log in with a JWT and manage their own expenses; every expense and statistic is 
 Administrators manage the shared category catalog and user accounts. All errors follow RFC 9457
 (`application/problem+json`).
 
+📘 **[Usage guide](docs/USAGE.md):** Docker, Gradle, configuration, every endpoint with curl examples,
+working with the database, changing the code and troubleshooting.
+
 ---
 
 ## Tech Stack
@@ -206,7 +209,7 @@ dates each get a specific message. Database constraint violations return 409 wit
 | Email | valid format, at most 254 chars, unique |
 | Password | 8 to 72 chars (the BCrypt input limit) |
 | First / last name | not blank, at most 50 chars |
-| Phone | international format, for example `+994501234567` |
+| Phone | 7 to 15 digits with an optional leading `+`, for example `+994501234567` |
 | Expense amount | greater than 0, at most 2 decimal places |
 | Expense description / note | at most 255 / 1000 chars |
 | Category name / icon / color | not blank, at most 50 / 50 / 30 chars |
