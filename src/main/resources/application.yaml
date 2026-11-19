@@ -14,7 +14,6 @@ spring:
     # Entities never leave the service layer, so no lazy loading is needed in the web layer.
     open-in-view: false
     show-sql: false
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:
       hibernate:
         format_sql: true
